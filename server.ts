@@ -565,6 +565,8 @@ app.post('/api/v1/endpoints', (req: Request, res: Response) => {
     }
   }
 
+  const managementToken = `mgm_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
   const newEndpoint: ChaosEndpoint = {
     id: `ep-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     slug,
@@ -572,9 +574,10 @@ app.post('/api/v1/endpoints', (req: Request, res: Response) => {
     isAnonymous: false,
     createdAt: new Date().toISOString(),
     expiresAt: null, // Persistent
+    managementToken,
     flakyPercentage,
     defaultResponseStatus: 200,
-    defaultResponseBody: JSON.stringify({ status: "success", message: "Normal response from Faultline chaos endpoint." }, null, 2),
+    defaultResponseBody: JSON.stringify({ status: "success", message: "Normal response from Hiccup chaos endpoint." }, null, 2),
     rules
   };
 
@@ -583,6 +586,19 @@ app.post('/api/v1/endpoints', (req: Request, res: Response) => {
   logsMap.set(newEndpoint.id, []);
 
   res.json({ success: true, endpoint: newEndpoint });
+});
+
+// Check if a Custom Slug is Available
+app.get('/api/v1/check-slug', (req: Request, res: Response) => {
+  const rawSlug = (req.query.slug as string || '').toLowerCase().trim();
+  if (!rawSlug) {
+    return res.json({ available: false, error: "Slug cannot be empty" });
+  }
+  if (!/^[a-z0-9-]+$/.test(rawSlug)) {
+    return res.json({ available: false, error: "Only lowercase letters, numbers, and hyphens allowed" });
+  }
+  const isTaken = slugToIdMap.has(rawSlug);
+  res.json({ available: !isTaken, taken: isTaken });
 });
 
 // List All Endpoints

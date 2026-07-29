@@ -69,6 +69,7 @@ export interface ChaosEndpoint {
   isAnonymous: boolean;
   createdAt: string;
   expiresAt?: string | null; // ISO date string or null
+  managementToken?: string; // unique token for custom endpoints
   flakyPercentage: number; // 0-100 master probability %
   defaultResponseStatus: number; // default 200
   defaultResponseBody: string; // JSON string

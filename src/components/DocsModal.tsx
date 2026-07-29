@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, X, ShieldCheck, Unplug, Clock, AlertTriangle, Cpu } from 'lucide-react';
+import { BookOpen, X, ShieldCheck, Unplug, Clock, AlertTriangle, Cpu, Zap, FileCode2 } from 'lucide-react';
 
 interface DocsModalProps {
   isOpen: boolean;
@@ -78,6 +78,26 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 <p className="text-[10px] text-zinc-400">
                   Enforces rate limits returning HTTP 429 along with standard `Retry-After` headers.
+                </p>
+              </div>
+
+              <div className="bg-black p-2.5 rounded border border-zinc-900">
+                <div className="flex items-center space-x-1.5 font-semibold text-zinc-200 mb-1">
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                  <span>Slow Drip Byte Streaming</span>
+                </div>
+                <p className="text-[10px] text-zinc-400">
+                  Transmits tiny byte chunks slowly with custom delay intervals to test chunked streaming parsers and read timeouts.
+                </p>
+              </div>
+
+              <div className="bg-black p-2.5 rounded border border-zinc-900">
+                <div className="flex items-center space-x-1.5 font-semibold text-zinc-200 mb-1">
+                  <FileCode2 className="w-3 h-3 text-pink-400" />
+                  <span>Malformed JSON Syntactic Error</span>
+                </div>
+                <p className="text-[10px] text-zinc-400">
+                  Returns HTTP 200 with corrupted, truncated JSON syntax to verify client JSON deserialization error handling.
                 </p>
               </div>
             </div>
