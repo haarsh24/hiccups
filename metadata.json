@@ -1,0 +1,6 @@
+{
+  "name": "Hiccup",
+  "description": "Minimalist hosted network chaos endpoint for testing retry, timeout, rate-limit, and connection drops.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
