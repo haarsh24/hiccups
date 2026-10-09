@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RotateCcw, AlertTriangle, Clock, Send, Play } from 'lucide-react';
 import { ChaosEndpoint, TestExecutionResult } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface LiveTesterProps {
   endpoint: ChaosEndpoint;
@@ -13,7 +14,7 @@ export const LiveTester: React.FC<LiveTesterProps> = ({ endpoint, onRefreshLogs 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TestExecutionResult | null>(null);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = getEndpointOrigin();
   const url = endpoint?.slug ? `${origin}/e/${endpoint.slug}` : '';
 
   const executeTest = async () => {

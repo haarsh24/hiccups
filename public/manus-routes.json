@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "path": "/",
+      "type": "page",
+      "description": "Hiccups Chaos Engineering Dashboard & Configurator"
+    },
+    {
+      "path": "/e/:slug",
+      "type": "api",
+      "description": "Hosted chaos fault-injection endpoint"
+    },
+    {
+      "path": "/e/:slug/*",
+      "type": "api",
+      "description": "Hosted chaos fault-injection subpath"
+    },
+    {
+      "path": "/api/v1/endpoints",
+      "type": "api",
+      "description": "List and create chaos endpoints"
+    },
+    {
+      "path": "/api/v1/playground",
+      "type": "api",
+      "description": "Create instant 24-hour sandbox endpoint"
+    },
+    {
+      "path": "/api/v1/check-slug",
+      "type": "api",
+      "description": "Validate and check slug availability"
+    },
+    {
+      "path": "/health",
+      "type": "api",
+      "description": "Service health check"
+    }
+  ]
+}

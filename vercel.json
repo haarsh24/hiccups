@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/manus-routes.json",
+      "destination": "/manus-routes.json"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api?__v_path=/api/$1"
+    },
+    {
+      "source": "/api",
+      "destination": "/api?__v_path=/health"
+    },
+    {
+      "source": "/e/(.*)",
+      "destination": "/api?__v_path=/e/$1"
+    },
+    {
+      "source": "/e",
+      "destination": "/api?__v_path=/health"
+    },
+    {
+      "source": "/health",
+      "destination": "/api?__v_path=/health"
+    },
+    {
+      "source": "/((?!api|e|health).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

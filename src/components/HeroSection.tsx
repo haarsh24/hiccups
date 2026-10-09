@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Check, ExternalLink, ArrowRight, Terminal } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface HeroSectionProps {
   endpoint?: ChaosEndpoint | null;
@@ -14,7 +15,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   loading
 }) => {
   const [copied, setCopied] = useState(false);
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hiccup.dev';
+  const origin = getEndpointOrigin();
   const fullEndpointUrl = endpoint?.slug ? `${origin}/e/${endpoint.slug}` : `${origin}/e/demo-chaos`;
 
   const copyUrl = () => {

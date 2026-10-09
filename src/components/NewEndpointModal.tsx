@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Layers, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { PRESET_PROFILES } from '../data/presets';
 import { ChaosEndpoint } from '../types';
+import { getApiUrl, getDefaultApiHeaders } from '../lib/config';
 
 interface NewEndpointModalProps {
   isOpen: boolean;
@@ -58,7 +59,9 @@ export const NewEndpointModal: React.FC<NewEndpointModalProps> = ({
     setSlugStatus({ checking: true, valid: null, message: 'Checking availability...' });
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/v1/check-slug?slug=${encodeURIComponent(slugToTest)}`);
+        const res = await fetch(getApiUrl(`/api/v1/check-slug?slug=${encodeURIComponent(slugToTest)}`), {
+          headers: getDefaultApiHeaders()
+        });
         const data = await res.json();
         if (data.taken) {
           setSlugStatus({

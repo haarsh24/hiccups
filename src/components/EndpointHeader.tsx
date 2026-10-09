@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Check, Clock, Trash2, RotateCcw, ExternalLink, Sliders } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface EndpointHeaderProps {
   endpoint: ChaosEndpoint;
@@ -20,7 +21,7 @@ export const EndpointHeader: React.FC<EndpointHeaderProps> = ({
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = getEndpointOrigin();
   const fullEndpointUrl = endpoint?.slug ? `${origin}/e/${endpoint.slug}` : '';
 
   useEffect(() => {
@@ -159,7 +160,7 @@ export const EndpointHeader: React.FC<EndpointHeaderProps> = ({
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
-              {!endpoint.isAnonymous && (
+              {!endpoint.isDemo && (
                 <button
                   onClick={onDeleteEndpoint}
                   className="text-zinc-400 hover:text-red-400 p-1 hover:bg-zinc-800 rounded transition-colors"

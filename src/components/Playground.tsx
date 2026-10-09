@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Zap, Copy, Check, ChevronDown, ChevronUp, Clock, Code2, History, RotateCw, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { ChaosEndpoint, TestExecutionResult } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface PlaygroundProps {
   endpoints: ChaosEndpoint[];
@@ -46,7 +47,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
   const [burstResults, setBurstResults] = useState<TestExecutionResult[]>([]);
   const [history, setHistory] = useState<RequestHistoryItem[]>([]);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hiccup.dev';
+  const origin = getEndpointOrigin();
   const cleanSubpath = subpath ? (subpath.startsWith('/') ? subpath : `/${subpath}`) : '';
   const fullTargetUrl = activeEndpoint?.slug ? `${origin}/e/${activeEndpoint.slug}${cleanSubpath}` : '';
 
@@ -61,12 +62,27 @@ export const Playground: React.FC<PlaygroundProps> = ({
 
     try {
       let customHeaders: Record<string, string> = {};
-      try {
-        if (headersText.trim()) {
-          customHeaders = JSON.parse(headersText);
+      if (headersText.trim()) {
+        try {
+          const parsed = JSON.parse(headersText);
+          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            customHeaders = parsed;
+          } else {
+            throw new Error('Custom headers must be a JSON object of key-value string pairs');
+          }
+        } catch (err: unknown) {
+          setLoading(false);
+          setLatestResponse({
+            status: 'CLIENT_VALIDATION_ERROR',
+            ok: false,
+            durationMs: 0,
+            headers: {},
+            body: `[Header Syntax Error] ${(err as Error).message || 'Invalid JSON format in custom headers'}. Example: {"Authorization": "Bearer token", "X-Custom": "val"}`,
+            error: 'Invalid custom headers JSON',
+            behaviorDetected: 'validation_error'
+          });
+          return;
         }
-      } catch {
-        // Fallback default
       }
 
       const options: RequestInit = {
@@ -87,7 +103,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
         respHeaders[key] = val;
       });
 
-      const behaviorDetected = res.headers.get('x-faultline-behavior') || 'none_clean';
+      const behaviorDetected = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || 'none_clean';
       const text = await res.text();
 
       const resultObj: TestExecutionResult = {
@@ -148,48 +164,48 @@ export const Playground: React.FC<PlaygroundProps> = ({
     }
   };
 
-  // Execute burst (10 requests)
+  // Execute burst (10 concurrent requests to test resilience & rate limiting)
   const executeBurst = async () => {
     if (!fullTargetUrl) return;
     setBurstLoading(true);
     setLatestResponse(null);
     setBurstResults([]);
 
-    const resultsArr: TestExecutionResult[] = [];
-
-    for (let i = 0; i < 10; i++) {
-      const startTime = performance.now();
+    const fetchSingle = async (index: number): Promise<TestExecutionResult> => {
+      const start = performance.now();
       try {
         const res = await fetch(fullTargetUrl, { method });
-        const endTime = performance.now();
-        const durationMs = Math.round(endTime - startTime);
-        
+        const durationMs = Math.round(performance.now() - start);
+
         const respHeaders: Record<string, string> = {};
         res.headers.forEach((v, k) => { respHeaders[k] = v; });
-        const behaviorDetected = res.headers.get('x-faultline-behavior') || 'none_clean';
+        const behaviorDetected = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || 'none_clean';
         const body = await res.text();
 
-        resultsArr.push({
+        return {
           status: res.status,
           ok: res.ok,
           durationMs,
           headers: respHeaders,
           body,
           behaviorDetected
-        });
+        };
       } catch (err: unknown) {
-        const endTime = performance.now();
-        resultsArr.push({
+        return {
           status: 'SOCKET_DROPPED',
           ok: false,
-          durationMs: Math.round(endTime - startTime),
+          durationMs: Math.round(performance.now() - start),
           headers: {},
-          body: 'Socket connection dropped',
+          body: 'Socket connection dropped / reset',
           error: err instanceof Error ? err.message : 'Socket dropped',
           behaviorDetected: 'drop'
-        });
+        };
       }
-    }
+    };
+
+    // Dispatch 10 concurrent requests simultaneously
+    const promises = Array.from({ length: 10 }, (_, i) => fetchSingle(i));
+    const resultsArr = await Promise.all(promises);
 
     setBurstResults(resultsArr);
     setBurstLoading(false);

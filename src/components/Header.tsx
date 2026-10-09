@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Sparkles, BookOpen, ChevronDown, Zap, Github, Play } from 'lucide-react';
+import { Plus, Sparkles, BookOpen, ChevronDown, Zap, Play } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
 
 interface HeaderProps {
@@ -33,10 +33,10 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-amber-500/10" />
             <span className="font-bold text-base tracking-tight text-zinc-900 font-mono">
-              hiccup
+              Hiccups
             </span>
-            <span className="text-xs text-zinc-400 font-mono hidden sm:inline">
-              .dev
+            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200/60 rounded px-1.5 py-0.5 font-mono hidden sm:inline">
+              chaos engine
             </span>
           </div>
         </div>
@@ -98,22 +98,11 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenDocs}
             className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all flex items-center space-x-1.5 shadow-2xs"
-            title="View Hiccup Architecture & Integration Guide"
+            title="View Hiccups Architecture & Integration Guide"
           >
             <BookOpen className="w-3.5 h-3.5 text-zinc-500" />
             <span className="hidden sm:inline">Docs</span>
           </button>
-
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noreferrer"
-            className="p-1.5 text-zinc-500 hover:text-zinc-800 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-colors flex items-center space-x-1"
-            title="Source Code (GitHub Repository)"
-          >
-            <Github className="w-4 h-4" />
-            <span className="sr-only">GitHub Repository</span>
-          </a>
 
           {/* 1-click Quick Endpoint Button */}
           <button

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Terminal, Copy, Check } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface CodeSnippetsProps {
   endpoint: ChaosEndpoint;
@@ -12,7 +13,7 @@ export const CodeSnippets: React.FC<CodeSnippetsProps> = ({ endpoint }) => {
   const [activeLang, setActiveLang] = useState<SnippetLang>('curl');
   const [copied, setCopied] = useState(false);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = getEndpointOrigin();
   const url = endpoint?.slug ? `${origin}/e/${endpoint.slug}` : '';
 
   const snippets: Record<SnippetLang, { title: string; code: string }> = {

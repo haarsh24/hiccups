@@ -67,6 +67,8 @@ export interface ChaosEndpoint {
   slug: string;
   name: string;
   isAnonymous: boolean;
+  isDemo?: boolean;
+  ownerSessionId?: string;
   createdAt: string;
   expiresAt?: string | null; // ISO date string or null
   managementToken?: string; // unique token for custom endpoints

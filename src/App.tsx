@@ -15,6 +15,7 @@ import { NewEndpointModal } from './components/NewEndpointModal';
 import { DocsModal } from './components/DocsModal';
 import { Playground } from './components/Playground';
 import { Activity, ChevronDown, ChevronUp, Terminal, Play, AlertCircle, RefreshCw, ArrowUp } from 'lucide-react';
+import { getApiUrl, getDefaultApiHeaders } from './lib/config';
 
 export default function App() {
   const [endpoints, setEndpoints] = useState<ChaosEndpoint[]>([]);
@@ -41,18 +42,27 @@ export default function App() {
     try {
       setLoading(true);
       setInitError(null);
-      const res = await fetch('/api/v1/endpoints');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = getApiUrl('/api/v1/endpoints');
+      const res = await fetch(url, { headers: getDefaultApiHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Invalid content type '${contentType || 'none'}', expected application/json`);
+      }
       const data = await res.json();
-      if (data.success && data.endpoints) {
+      if (data.success && Array.isArray(data.endpoints)) {
         setEndpoints(data.endpoints);
-        if (!activeEndpointId && data.endpoints.length > 0) {
-          setActiveEndpointId(data.endpoints[0].id);
+        if (data.endpoints.length > 0) {
+          const exists = data.endpoints.some((e: ChaosEndpoint) => e.id === activeEndpointId);
+          if (!exists || !activeEndpointId) {
+            setActiveEndpointId(data.endpoints[0].id);
+          }
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch endpoints:', err);
-      setInitError('Could not reach Hiccup chaos server. Please check your connection.');
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message || 'Unknown network error';
+      console.error('Failed to fetch endpoints from backend:', err);
+      setInitError(`Could not reach Hiccup chaos server (${msg}). Please verify your connection or refresh the page.`);
     } finally {
       setLoading(false);
     }
@@ -67,21 +77,36 @@ export default function App() {
 
   // Fetch Telemetry Logs & Stats for active endpoint
   const fetchTelemetry = useCallback(async () => {
-    if (!activeEndpoint) return;
+    if (!activeEndpoint || !activeEndpoint.id) return;
     try {
       setLogsLoading(true);
+      const headers = getDefaultApiHeaders();
       const [logsRes, statsRes] = await Promise.all([
-        fetch(`/api/v1/endpoints/${activeEndpoint.id}/logs`),
-        fetch(`/api/v1/endpoints/${activeEndpoint.id}/stats`)
+        fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}/logs`), { headers }),
+        fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}/stats`), { headers })
       ]);
 
-      const logsData = await logsRes.json();
-      const statsData = await statsRes.json();
+      if (logsRes.ok) {
+        const ct = logsRes.headers.get('content-type');
+        if (ct && ct.includes('application/json')) {
+          const logsData = await logsRes.json();
+          if (logsData.success && Array.isArray(logsData.logs)) {
+            setLogs(logsData.logs);
+          }
+        }
+      }
 
-      if (logsData.success) setLogs(logsData.logs || []);
-      if (statsData.success) setStats(statsData.stats || null);
+      if (statsRes.ok) {
+        const ct = statsRes.headers.get('content-type');
+        if (ct && ct.includes('application/json')) {
+          const statsData = await statsRes.json();
+          if (statsData.success && statsData.stats) {
+            setStats(statsData.stats);
+          }
+        }
+      }
     } catch (err) {
-      console.error('Failed to fetch telemetry:', err);
+      console.error('Failed to fetch telemetry from backend:', err);
     } finally {
       setLogsLoading(false);
     }
@@ -100,8 +125,16 @@ export default function App() {
     try {
       setLoading(true);
       setInitError(null);
-      const res = await fetch('/api/v1/playground', { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const targetUrl = getApiUrl('/api/v1/playground');
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: getDefaultApiHeaders()
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Server returned HTML/non-JSON response from ${targetUrl}`);
+      }
       const data = await res.json();
       if (data.success && data.endpoint) {
         setEndpoints(prev => [data.endpoint, ...prev]);
@@ -114,9 +147,10 @@ export default function App() {
       } else {
         throw new Error(data.message || 'Creation failed');
       }
-    } catch (err) {
-      console.error('Failed to create playground endpoint:', err);
-      setInitError('Failed to generate 24h Quick Sandbox endpoint. Click retry.');
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message || 'Network request failed';
+      console.error('Failed to generate 24h Quick Sandbox endpoint:', err);
+      setInitError(`Failed to generate 24h Quick Sandbox endpoint (${msg}). Check console for details.`);
     } finally {
       setLoading(false);
     }
@@ -127,12 +161,12 @@ export default function App() {
     try {
       setLoading(true);
       setInitError(null);
-      const res = await fetch('/api/v1/endpoints', {
+      const res = await fetch(getApiUrl('/api/v1/endpoints'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ name, customSlug, presetId })
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       const data = await res.json();
       if (data.success && data.endpoint) {
         setEndpoints(prev => [data.endpoint, ...prev]);
@@ -144,9 +178,10 @@ export default function App() {
       } else {
         throw new Error(data.message || 'Creation failed');
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message || 'Network request failed';
       console.error('Failed to create named endpoint:', err);
-      setInitError('Failed to create custom endpoint slug.');
+      setInitError(`Failed to create custom endpoint slug (${msg}).`);
     } finally {
       setLoading(false);
     }
@@ -156,14 +191,16 @@ export default function App() {
   const handleUpdateFlakyPercentage = async (val: number) => {
     if (!activeEndpoint) return;
     try {
-      const res = await fetch(`/api/v1/endpoints/${activeEndpoint.id}`, {
+      const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ flakyPercentage: val })
       });
-      const data = await res.json();
-      if (data.success && data.endpoint) {
-        setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.endpoint) {
+          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+        }
       }
     } catch (err) {
       console.error('Failed to update flaky percentage:', err);
@@ -176,14 +213,16 @@ export default function App() {
     const updatedRules = activeEndpoint.rules.map(r => r.id === ruleId ? { ...r, ...updated } : r);
 
     try {
-      const res = await fetch(`/api/v1/endpoints/${activeEndpoint.id}`, {
+      const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ rules: updatedRules })
       });
-      const data = await res.json();
-      if (data.success && data.endpoint) {
-        setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.endpoint) {
+          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+        }
       }
     } catch (err) {
       console.error('Failed to update rule:', err);
@@ -194,14 +233,16 @@ export default function App() {
   const handleApplyPreset = async (presetId: string) => {
     if (!activeEndpoint) return;
     try {
-      const res = await fetch(`/api/v1/endpoints/${activeEndpoint.id}/apply-preset`, {
+      const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}/apply-preset`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ presetId })
       });
-      const data = await res.json();
-      if (data.success && data.endpoint) {
-        setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.endpoint) {
+          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+        }
       }
     } catch (err) {
       console.error('Failed to apply preset:', err);
@@ -212,7 +253,10 @@ export default function App() {
   const handleClearLogs = async () => {
     if (!activeEndpoint) return;
     try {
-      await fetch(`/api/v1/endpoints/${activeEndpoint.id}/logs`, { method: 'DELETE' });
+      await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}/logs`), {
+        method: 'DELETE',
+        headers: getDefaultApiHeaders()
+      });
       setLogs([]);
       fetchTelemetry();
     } catch (err) {
@@ -222,20 +266,30 @@ export default function App() {
 
   // Delete Endpoint
   const handleDeleteEndpoint = async () => {
-    if (!activeEndpoint || activeEndpoint.isAnonymous) return;
+    if (!activeEndpoint) return;
+    if (activeEndpoint.isDemo) {
+      alert('The Demo Chaos Endpoint is a permanent shared showcase and cannot be deleted.');
+      return;
+    }
     if (!confirm(`Are you sure you want to delete endpoint '${activeEndpoint.name}'?`)) return;
 
     try {
-      await fetch(`/api/v1/endpoints/${activeEndpoint.id}`, { method: 'DELETE' });
-      const remaining = endpoints.filter(e => e.id !== activeEndpoint.id);
-      setEndpoints(remaining);
-      if (remaining.length > 0) {
-        setActiveEndpointId(remaining[0].id);
+      const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
+        method: 'DELETE',
+        headers: getDefaultApiHeaders()
+      });
+      if (res.ok) {
+        const remaining = endpoints.filter(e => e.id !== activeEndpoint.id);
+        setEndpoints(remaining);
+        if (remaining.length > 0) {
+          setActiveEndpointId(remaining[0].id);
+        }
       }
     } catch (err) {
       console.error('Failed to delete endpoint:', err);
     }
   };
+
 
   const scrollToConfigurator = () => {
     if (configuratorRef.current) {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Check, Play, Settings, Key, Zap, Shield, Sparkles } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
+import { getEndpointOrigin } from '../lib/config';
 
 interface PostCreationCardProps {
   endpoint: ChaosEndpoint;
@@ -16,7 +17,7 @@ export const PostCreationCard: React.FC<PostCreationCardProps> = ({
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hiccup.dev';
+  const origin = getEndpointOrigin();
   const fullUrl = `${origin}/e/${endpoint.slug}`;
   const managementToken = endpoint.managementToken;
 
