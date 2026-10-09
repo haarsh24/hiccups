@@ -756,25 +756,39 @@ app.post('/api/v1/playground', (req: Request, res: Response) => {
     customSlug = generateSlug();
   }
 
+  const { presetId } = req.body || {};
+  let rules = createDefaultRules();
+  let flakyPercentage = 60;
+  let endpointName = '24h Quick Sandbox';
+
+  if (presetId) {
+    const preset = PRESET_PROFILES.find(p => p.id === presetId);
+    if (preset) {
+      rules = JSON.parse(JSON.stringify(preset.rules));
+      flakyPercentage = preset.flakyPercentage;
+      endpointName = `Sandbox (${preset.name})`;
+    }
+  }
+
   const managementToken = `mgm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 
   const newEndpoint: ChaosEndpoint = {
     id: `ep-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     slug: customSlug,
-    name: '24h Quick Sandbox',
+    name: endpointName,
     isAnonymous: true,
     ownerSessionId: sessionId || undefined,
     managementToken,
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours TTL
-    flakyPercentage: 60,
+    flakyPercentage,
     defaultResponseStatus: 200,
     defaultResponseBody: JSON.stringify(
       { status: "success", data: "Clean response from your Hiccups sandbox endpoint." },
       null,
       2
     ),
-    rules: createDefaultRules()
+    rules
   };
 
   endpointsMap.set(newEndpoint.id, newEndpoint);

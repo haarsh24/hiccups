@@ -75,11 +75,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           {/* Playground Top Nav Link */}
           <button
             onClick={onGoToPlayground}
-            className="px-3 py-1.5 text-xs font-semibold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all flex items-center space-x-1.5 shadow-2xs"
+            className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-2xs"
             title="Open In-Browser Live Chaos Playground"
           >
             <Play className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onOpenPresets}
-            className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all flex items-center space-x-1.5 shadow-2xs"
+            className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-2xs"
             title="Load Pre-configured Network Scenarios"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -97,27 +97,26 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onOpenDocs}
-            className="px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all flex items-center space-x-1.5 shadow-2xs"
+            className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-lg transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-2xs"
             title="View Hiccups Architecture & Integration Guide"
           >
             <BookOpen className="w-3.5 h-3.5 text-zinc-500" />
             <span className="hidden sm:inline">Docs</span>
           </button>
 
-          {/* 1-click Quick Endpoint Button */}
+          {/* Quick Sandbox Endpoint Button */}
           <button
             onClick={onCreatePlayground}
             disabled={loading}
-            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+            className="px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-sm active:scale-95 disabled:opacity-50"
             title="Instantly generate 24-hour sandbox endpoint with zero form fields"
           >
             <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Quick Endpoint</span>
+            <span className="hidden xs:inline sm:inline">+ Quick Endpoint</span>
+            <span className="inline xs:hidden sm:hidden">+ Quick</span>
           </button>
         </div>
       </div>
     </header>
   );
 };
-
-

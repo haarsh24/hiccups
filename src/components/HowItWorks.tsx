@@ -24,8 +24,8 @@ export const HowItWorks: React.FC = () => {
   ];
 
   return (
-    <section className="py-8 border-b border-zinc-200/60 bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+    <section className="py-6 border-b border-zinc-200/60 bg-white rounded-2xl border border-zinc-200/80 p-5 shadow-2xs">
+      <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((s) => (
             <div

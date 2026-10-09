@@ -176,4 +176,3 @@ export const EndpointHeader: React.FC<EndpointHeaderProps> = ({
     </div>
   );
 };
-

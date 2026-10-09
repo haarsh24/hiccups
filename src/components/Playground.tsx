@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Zap, Copy, Check, ChevronDown, ChevronUp, Clock, Code2, History, RotateCw, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Zap, Copy, Check, ChevronDown, ChevronUp, Clock, Code2, History, RotateCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ChaosEndpoint, TestExecutionResult } from '../types';
 import { getEndpointOrigin } from '../lib/config';
 
@@ -98,151 +98,151 @@ export const Playground: React.FC<PlaygroundProps> = ({
       const endTime = performance.now();
       const durationMs = Math.round(endTime - startTime);
 
-      const respHeaders: Record<string, string> = {};
+      const headerMap: Record<string, string> = {};
       res.headers.forEach((val, key) => {
-        respHeaders[key] = val;
+        headerMap[key] = val;
       });
 
-      const behaviorDetected = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || 'none_clean';
-      const text = await res.text();
+      const behavior = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || (res.ok ? 'clean_200' : 'error_response');
+      const responseText = await res.text();
 
-      const resultObj: TestExecutionResult = {
+      const result: TestExecutionResult = {
         status: res.status,
         ok: res.ok,
         durationMs,
-        headers: respHeaders,
-        body: text,
-        behaviorDetected
+        headers: headerMap,
+        body: responseText,
+        behaviorDetected: behavior
       };
 
-      setLatestResponse(resultObj);
+      setLatestResponse(result);
+      setHistory(prev => [
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date().toLocaleTimeString(),
+          method,
+          url: fullTargetUrl,
+          status: res.status,
+          durationMs,
+          behavior
+        },
+        ...prev.slice(0, 19)
+      ]);
 
-      // Add to history
-      const histItem: RequestHistoryItem = {
-        id: `hist-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        method,
-        url: fullTargetUrl,
-        status: res.status,
-        durationMs,
-        behavior: formatBehaviorName(behaviorDetected, res.status)
-      };
-
-      setHistory(prev => [histItem, ...prev.slice(0, 9)]);
-
-      if (onRefreshLogs) onRefreshLogs();
+      if (onRefreshLogs) {
+        setTimeout(onRefreshLogs, 500);
+      }
     } catch (err: unknown) {
       const endTime = performance.now();
       const durationMs = Math.round(endTime - startTime);
-      const errorMsg = err instanceof Error ? err.message : 'Network Connection Dropped / Socket Reset';
+      const errMsg = err instanceof Error ? err.message : 'Unknown connection drop or fetch error';
 
-      const resultObj: TestExecutionResult = {
+      const droppedResult: TestExecutionResult = {
         status: 'SOCKET_DROPPED',
         ok: false,
         durationMs,
         headers: {},
-        body: `[Network Fault] ${errorMsg}`,
-        error: errorMsg,
-        behaviorDetected: 'drop'
+        body: `[TCP Failure / Socket Reset] Connection was reset or aborted by server: ${errMsg}`,
+        error: errMsg,
+        behaviorDetected: 'socket_dropped_econnreset'
       };
 
-      setLatestResponse(resultObj);
+      setLatestResponse(droppedResult);
+      setHistory(prev => [
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date().toLocaleTimeString(),
+          method,
+          url: fullTargetUrl,
+          status: 'DROPPED',
+          durationMs,
+          behavior: 'socket_dropped'
+        },
+        ...prev.slice(0, 19)
+      ]);
 
-      setHistory(prev => [{
-        id: `hist-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        timestamp: new Date().toLocaleTimeString(),
-        method,
-        url: fullTargetUrl,
-        status: 'DROPPED',
-        durationMs,
-        behavior: 'Connection Reset / Socket Destroyed'
-      }, ...prev.slice(0, 9)]);
-
-      if (onRefreshLogs) onRefreshLogs();
+      if (onRefreshLogs) {
+        setTimeout(onRefreshLogs, 500);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Execute burst (10 concurrent requests to test resilience & rate limiting)
+  // Burst 10x requests
   const executeBurst = async () => {
     if (!fullTargetUrl) return;
     setBurstLoading(true);
-    setLatestResponse(null);
     setBurstResults([]);
+    setLatestResponse(null);
 
-    const fetchSingle = async (index: number): Promise<TestExecutionResult> => {
+    const burstItems: TestExecutionResult[] = [];
+
+    for (let i = 0; i < 10; i++) {
       const start = performance.now();
       try {
         const res = await fetch(fullTargetUrl, { method });
         const durationMs = Math.round(performance.now() - start);
-
-        const respHeaders: Record<string, string> = {};
-        res.headers.forEach((v, k) => { respHeaders[k] = v; });
-        const behaviorDetected = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || 'none_clean';
-        const body = await res.text();
-
-        return {
+        const behavior = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || 'none_clean';
+        burstItems.push({
           status: res.status,
           ok: res.ok,
           durationMs,
-          headers: respHeaders,
-          body,
-          behaviorDetected
-        };
+          headers: {},
+          body: '',
+          behaviorDetected: behavior
+        });
       } catch (err: unknown) {
-        return {
+        const durationMs = Math.round(performance.now() - start);
+        burstItems.push({
           status: 'SOCKET_DROPPED',
           ok: false,
-          durationMs: Math.round(performance.now() - start),
+          durationMs,
           headers: {},
-          body: 'Socket connection dropped / reset',
-          error: err instanceof Error ? err.message : 'Socket dropped',
-          behaviorDetected: 'drop'
-        };
+          body: '',
+          behaviorDetected: 'socket_dropped'
+        });
       }
-    };
+      setBurstResults([...burstItems]);
+      await new Promise(r => setTimeout(r, 80));
+    }
 
-    // Dispatch 10 concurrent requests simultaneously
-    const promises = Array.from({ length: 10 }, (_, i) => fetchSingle(i));
-    const resultsArr = await Promise.all(promises);
-
-    setBurstResults(resultsArr);
     setBurstLoading(false);
-    if (onRefreshLogs) onRefreshLogs();
+    if (onRefreshLogs) {
+      setTimeout(onRefreshLogs, 600);
+    }
   };
 
   const formatBehaviorName = (behavior?: string, status?: number | string) => {
-    if (status === 'SOCKET_DROPPED' || behavior === 'drop') return '🔌 Abrupt TCP Reset (ECONNRESET)';
-    if (behavior === 'rate_limit' || status === 429) return '🚧 Rate Limit 429 Exceeded';
-    if (behavior === 'latency') return '⏱️ Latency Delay Injected';
-    if (behavior === 'hang') return '⏳ Silent Socket Hang';
-    if (behavior === 'drip') return '💧 Slow Drip Byte Stream';
-    if (behavior === 'malformed') return '🧩 Malformed Corrupted JSON';
-    if (behavior === 'error') return `💥 HTTP ${status} Error Injected`;
-    if (behavior === 'none_clean') return '✅ Clean Response (No Chaos)';
-    return `Behavior: ${behavior || 'applied'}`;
+    if (!behavior) return 'Standard Response';
+    if (behavior.includes('socket_dropped')) return '🔌 Socket Abruptly Destroyed';
+    if (behavior.includes('hang')) return '⏳ Read Timeout (Connection Held Open)';
+    if (behavior.includes('rate_limit')) return '🚧 HTTP 429 Sliding Window Exceeded';
+    if (behavior.includes('drip')) return '💧 Slow Drip Stream';
+    if (behavior.includes('error')) return `💥 Injected HTTP ${status} Error`;
+    if (behavior.includes('latency')) return '⏱️ Injected Delay Jitter';
+    return behavior;
   };
 
-  // Generate code snippet
   const generateCodeSnippet = () => {
-    if (!fullTargetUrl) return '';
     if (snippetLang === 'curl') {
-      let cmd = `curl -X ${method} "${fullTargetUrl}"`;
-      if (showHeaders && headersText) {
+      let cmd = `curl -i -X ${method} "${fullTargetUrl}"`;
+      if (headersText.trim()) {
         try {
-          const parsed = JSON.parse(headersText);
-          Object.entries(parsed).forEach(([k, v]) => {
+          const h = JSON.parse(headersText);
+          Object.entries(h).forEach(([k, v]) => {
             cmd += ` \\\n  -H "${k}: ${v}"`;
           });
-        } catch { /* empty */ }
+        } catch {
+          // ignore
+        }
       }
-      if ((method === 'POST' || method === 'PUT') && requestBodyText) {
+      if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && requestBodyText.trim()) {
         cmd += ` \\\n  -d '${requestBodyText.replace(/\n/g, '')}'`;
       }
       return cmd;
     } else if (snippetLang === 'javascript') {
-      return `// Native Fetch with error handling
+      return `// Native Fetch with resilient error inspection
 fetch("${fullTargetUrl}", {
   method: "${method}",
   headers: ${headersText || '{}'}${
@@ -250,32 +250,55 @@ fetch("${fullTargetUrl}", {
       }
 })
   .then(async (res) => {
-    if (!res.ok) throw new Error(\`HTTP \${res.status}: \${await res.text()}\`);
+    console.log("Status:", res.status);
+    console.log("Hiccup Behavior:", res.headers.get("x-hiccup-behavior"));
+    if (!res.ok) {
+      throw new Error(\`HTTP \${res.status}: \${await res.text()}\`);
+    }
     return res.json();
   })
-  .then(data => console.log('Success:', data))
-  .catch(err => console.error('Caught Hiccup Chaos:', err.message));`;
+  .then((data) => console.log("Success:", data))
+  .catch((err) => console.error("Caught fault (retry logic triggered):", err.message));`;
     } else if (snippetLang === 'axios') {
-      return `// Axios with explicit timeout & retry configuration
+      return `// Axios with timeout and error handling
 import axios from 'axios';
 
 axios({
-  url: '${fullTargetUrl}',
-  method: '${method.toLowerCase()}',
+  method: "${method.toLowerCase()}",
+  url: "${fullTargetUrl}",
   headers: ${headersText || '{}'},
-  timeout: 3000, // 3s timeout to catch Hiccup hangs
-  ${(method === 'POST' || method === 'PUT' || method === 'PATCH') ? `data: ${requestBodyText || '{}'},` : ''}
-  validateStatus: (status) => status >= 200 && status < 300
+  timeout: 3000${
+    method === 'POST' || method === 'PUT' || method === 'PATCH' ? `,\n  data: ${requestBodyText || '{}'}` : ''
+  }
 })
-  .then(res => console.log('Data:', res.data))
-  .catch(err => {
-    if (err.code === 'ECONNABORTED') console.error('Hiccup timeout triggered!');
-    else console.error('Hiccup error response:', err.response?.status, err.message);
+  .then((response) => {
+    console.log("Status:", response.status);
+    console.log("Behavior:", response.headers["x-hiccup-behavior"]);
+    console.log("Data:", response.data);
+  })
+  .catch((error) => {
+    if (error.code === 'ECONNABORTED') {
+      console.error("Timeout exceeded 3000ms!");
+    } else if (error.response) {
+      console.error(\`Server responded with \${error.response.status}\`);
+    } else {
+      console.error("Network reset / drop:", error.message);
+    }
   });`;
     } else {
-      return `import requests\n\nurl = "${fullTargetUrl}"\nheaders = ${headersText || '{}'}\n\ntry:\n    response = requests.${method.toLowerCase()}(url, headers=headers${
-        method === 'POST' || method === 'PUT' || method === 'PATCH' ? `, json=${requestBodyText || '{}'}` : ''
-      }, timeout=5)\n    response.raise_for_status()\n    print(response.json())\nexcept requests.exceptions.RequestException as e:\n    print(f"Caught Hiccup chaos: {e}")`;
+      return `import requests
+
+try:
+    response = requests.${method.toLowerCase()}(
+        "${fullTargetUrl}",
+        headers=${headersText || '{}'},
+        timeout=5${method === 'POST' || method === 'PUT' ? `,\n        json=${requestBodyText || '{}'}` : ''}
+    )
+    print("Status:", response.status_code)
+    print("Behavior Header:", response.headers.get("x-hiccup-behavior"))
+    print("Body:", response.text)
+except requests.exceptions.RequestException as e:
+    print("Handled network fault:", e)`;
     }
   };
 
@@ -394,7 +417,7 @@ axios({
               <span>Headers {showHeaders ? '(Hide)' : '(Show)'}</span>
             </button>
 
-            {(method === 'POST' || method === 'PUT') && (
+            {(method === 'POST' || method === 'PUT' || method === 'PATCH') && (
               <button
                 onClick={() => setShowBody(prev => !prev)}
                 className="hover:text-zinc-900 transition-colors flex items-center space-x-1"
@@ -419,7 +442,7 @@ axios({
           )}
 
           {/* Body Editor */}
-          {showBody && (method === 'POST' || method === 'PUT') && (
+          {showBody && (method === 'POST' || method === 'PUT' || method === 'PATCH') && (
             <div className="space-y-1">
               <label className="text-[11px] font-mono text-zinc-500">Request Body (JSON)</label>
               <textarea
@@ -530,8 +553,8 @@ axios({
           </div>
 
           {/* Burst Breakdown Table */}
-          <div className="border border-zinc-800/80 rounded-xl overflow-hidden text-[11px]">
-            <table className="w-full text-left">
+          <div className="border border-zinc-800/80 rounded-xl overflow-x-auto text-[11px]">
+            <table className="w-full text-left min-w-[340px]">
               <thead className="bg-zinc-900 text-zinc-400 border-b border-zinc-800">
                 <tr>
                   <th className="px-3 py-2">#</th>

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Play, Copy, Check, Terminal, RotateCw, AlertTriangle, CheckCircle2, Zap } from 'lucide-react';
+import { Play, Copy, Check, Terminal, RotateCw, ArrowDown } from 'lucide-react';
 import { ChaosEndpoint } from '../types';
 import { getEndpointOrigin } from '../lib/config';
 
 interface HeroSectionProps {
   endpoint?: ChaosEndpoint | null;
   onGetChaosUrl: () => void;
-  onExplorePresets: () => void;
   loading?: boolean;
 }
 
@@ -21,7 +20,6 @@ interface ProbeResult {
 export const HeroSection: React.FC<HeroSectionProps> = ({
   endpoint,
   onGetChaosUrl,
-  onExplorePresets,
   loading
 }) => {
   const [copied, setCopied] = useState(false);
@@ -178,30 +176,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               ) : (
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono px-1">
                   <span>Click <strong className="text-zinc-700">Try Live Now</strong> to see the injected chaos instantly.</span>
-                  <button
-                    onClick={onExplorePresets}
-                    className="text-amber-600 hover:text-amber-700 font-semibold hover:underline"
-                  >
-                    Browse 6 Presets →
-                  </button>
+                  <span className="text-zinc-400 hidden sm:inline">Zero installation needed</span>
                 </div>
               )}
             </div>
 
-            {/* Quick action buttons */}
+            {/* Action button */}
             <div className="flex items-center space-x-3 pt-1">
               <button
                 onClick={onGetChaosUrl}
                 className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white font-semibold rounded-xl transition-all shadow-2xs flex items-center space-x-1.5 text-xs"
               >
                 <span>Customize Chaos Rules</span>
-                <span>↓</span>
-              </button>
-              <button
-                onClick={onExplorePresets}
-                className="px-3.5 py-2 bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 font-medium rounded-xl transition-colors text-xs shadow-2xs"
-              >
-                ⚡ 1-Click Scenarios
+                <ArrowDown className="w-3.5 h-3.5 text-amber-400" />
               </button>
             </div>
           </div>

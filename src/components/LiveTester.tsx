@@ -175,5 +175,3 @@ export const LiveTester: React.FC<LiveTesterProps> = ({ endpoint, onRefreshLogs 
     </div>
   );
 };
-
-

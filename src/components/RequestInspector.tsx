@@ -98,7 +98,7 @@ export const RequestInspector: React.FC<RequestInspectorProps> = ({
         <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-8 text-center text-zinc-500 text-xs space-y-1">
           <p className="font-semibold text-zinc-700">No telemetry recorded yet.</p>
           <p className="text-[11px] text-zinc-400 font-sans">
-            Send a request using the live workbench or cURL to capture real-time logs.
+            Send a request using the in-browser playground or cURL to capture real-time logs.
           </p>
         </div>
       ) : (
@@ -188,5 +188,3 @@ export const RequestInspector: React.FC<RequestInspectorProps> = ({
     </div>
   );
 };
-
-

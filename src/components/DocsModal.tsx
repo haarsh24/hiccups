@@ -130,4 +130,3 @@ export const DocsModal: React.FC<DocsModalProps> = ({ isOpen, onClose }) => {
     </div>
   );
 };
-

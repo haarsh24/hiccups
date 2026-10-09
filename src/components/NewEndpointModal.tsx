@@ -197,4 +197,3 @@ export const NewEndpointModal: React.FC<NewEndpointModalProps> = ({
     </div>
   );
 };
-

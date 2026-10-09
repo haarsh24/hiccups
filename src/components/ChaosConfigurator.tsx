@@ -486,5 +486,3 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
     </div>
   );
 };
-
-

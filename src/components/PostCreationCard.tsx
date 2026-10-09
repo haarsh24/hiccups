@@ -117,7 +117,7 @@ export const PostCreationCard: React.FC<PostCreationCardProps> = ({
           <span>Live Endpoint URL</span>
         </label>
         <div className="flex items-center bg-white border border-zinc-300 rounded-xl p-2 shadow-2xs group focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500">
-          <code className="text-xs sm:text-sm font-mono text-zinc-900 px-2 truncate flex-1 font-semibold">
+          <code className="text-xs sm:text-sm font-mono text-zinc-900 px-2 truncate flex-1 font-semibold select-all">
             {fullUrl}
           </code>
           <button
@@ -143,40 +143,47 @@ export const PostCreationCard: React.FC<PostCreationCardProps> = ({
         </div>
       </div>
 
-      {/* Active Chaos Rules Summary */}
-      <div className="bg-white/80 border border-zinc-200 rounded-xl p-4 space-y-2">
-        <h4 className="text-xs font-bold text-zinc-800 uppercase tracking-wider font-mono flex items-center space-x-1.5">
-          <Shield className="w-3.5 h-3.5 text-zinc-500" />
-          <span>Active Chaos Rules ({activeRules.length} Enabled)</span>
-        </h4>
-        <ul className="space-y-1 text-xs text-zinc-600 font-mono">
-          {ruleDescriptions.map((desc, idx) => (
-            <li key={idx} className="flex items-start space-x-2">
-              <span className="text-amber-500 shrink-0">•</span>
-              <span>{desc}</span>
-            </li>
-          ))}
-        </ul>
+      {/* Key & Sandbox Info */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        {managementToken && (
+          <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3 flex items-center justify-between text-xs font-mono">
+            <div className="truncate mr-2">
+              <span className="text-zinc-400 block text-[10px]">MANAGEMENT TOKEN</span>
+              <span className="text-zinc-700 truncate block">••••••••{managementToken.slice(-6)}</span>
+            </div>
+            <button
+              onClick={copyToken}
+              className="px-2 py-1 bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-700 rounded text-[11px] transition-colors shrink-0 flex items-center space-x-1"
+            >
+              {copiedToken ? <Check className="w-3 h-3 text-emerald-600" /> : <Key className="w-3 h-3 text-zinc-400" />}
+              <span>{copiedToken ? 'Copied' : 'Copy Token'}</span>
+            </button>
+          </div>
+        )}
+
+        <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3 flex items-center space-x-2 text-xs">
+          <Shield className="w-4 h-4 text-amber-500 shrink-0" />
+          <div className="text-zinc-600 leading-snug">
+            {endpoint.isDemo ? (
+              <span>This is the public demo endpoint. Create a quick sandbox to save custom misbehaviors.</span>
+            ) : (
+              <span>Private sandbox endpoint. Header authorization enabled for full rule customization.</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Management Token Notification (if persistent / named endpoint) */}
-      {managementToken && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-          <div className="flex items-center space-x-2 text-zinc-800">
-            <Key className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              <strong>Management Token:</strong> <code className="bg-white px-1.5 py-0.5 rounded border border-amber-500/30 font-mono font-semibold text-zinc-900">{managementToken}</code> — Save this token to edit or delete this endpoint later.
-            </span>
-          </div>
-          <button
-            onClick={copyToken}
-            className="px-2.5 py-1 bg-white hover:bg-amber-50 border border-amber-500/30 text-amber-900 font-semibold rounded-lg text-[11px] transition-colors shrink-0 flex items-center space-x-1"
-          >
-            {copiedToken ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-amber-700" />}
-            <span>{copiedToken ? 'Token Copied!' : 'Copy Token'}</span>
-          </button>
+      {/* Active Rules List */}
+      <div className="pt-2 border-t border-zinc-200/60">
+        <div className="text-[11px] font-mono text-zinc-500 font-semibold mb-2">ACTIVE BEHAVIOR RULES ({activeRules.length})</div>
+        <div className="flex flex-wrap gap-2">
+          {ruleDescriptions.map((desc, idx) => (
+            <div key={idx} className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-zinc-700 shadow-2xs">
+              {desc}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };
