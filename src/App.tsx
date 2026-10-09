@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { HowItWorks } from './components/HowItWorks';
 import { PostCreationCard } from './components/PostCreationCard';
+import { PresetBar } from './components/PresetBar';
 import { ChaosConfigurator } from './components/ChaosConfigurator';
 import { EndpointHeader } from './components/EndpointHeader';
 import { StatsOverview } from './components/StatsOverview';
@@ -17,9 +18,40 @@ import { Playground } from './components/Playground';
 import { Activity, ChevronDown, ChevronUp, Terminal, Play, AlertCircle, RefreshCw, ArrowUp } from 'lucide-react';
 import { getApiUrl, getDefaultApiHeaders } from './lib/config';
 
+const CACHED_ENDPOINTS_KEY = 'hiccups_user_endpoints_cache';
+
+function loadCachedEndpoints(): ChaosEndpoint[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CACHED_ENDPOINTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedEndpoints(eps: ChaosEndpoint[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    // Only cache non-demo endpoints
+    const toSave = eps.filter(e => !e.isDemo);
+    localStorage.setItem(CACHED_ENDPOINTS_KEY, JSON.stringify(toSave));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export default function App() {
-  const [endpoints, setEndpoints] = useState<ChaosEndpoint[]>([]);
-  const [activeEndpointId, setActiveEndpointId] = useState<string>('');
+  const [endpoints, setEndpoints] = useState<ChaosEndpoint[]>(() => {
+    const cached = loadCachedEndpoints();
+    return cached.length > 0 ? cached : [];
+  });
+  const [activeEndpointId, setActiveEndpointId] = useState<string>(() => {
+    const cached = loadCachedEndpoints();
+    return cached.length > 0 ? cached[0].id : '';
+  });
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const [stats, setStats] = useState<EndpointStats | null>(null);
 
@@ -51,18 +83,45 @@ export default function App() {
       }
       const data = await res.json();
       if (data.success && Array.isArray(data.endpoints)) {
-        setEndpoints(data.endpoints);
-        if (data.endpoints.length > 0) {
-          const exists = data.endpoints.some((e: ChaosEndpoint) => e.id === activeEndpointId);
+        const serverEndpoints: ChaosEndpoint[] = data.endpoints;
+        const cached = loadCachedEndpoints();
+
+        // Merge: keep all server endpoints, plus any locally cached endpoints not yet on this server instance
+        const serverIds = new Set(serverEndpoints.map(e => e.id));
+        const missingOnServer = cached.filter(e => !serverIds.has(e.id));
+
+        const combined = [...serverEndpoints];
+        for (const m of missingOnServer) {
+          combined.push(m);
+        }
+
+        // If serverless container cold-started without local endpoints, re-sync them
+        if (missingOnServer.length > 0) {
+          fetch(getApiUrl('/api/v1/endpoints/sync'), {
+            method: 'POST',
+            headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ endpoints: missingOnServer })
+          }).catch(() => {});
+        }
+
+        setEndpoints(combined);
+        saveCachedEndpoints(combined);
+
+        if (combined.length > 0) {
+          const exists = combined.some((e: ChaosEndpoint) => e.id === activeEndpointId);
           if (!exists || !activeEndpointId) {
-            setActiveEndpointId(data.endpoints[0].id);
+            setActiveEndpointId(combined[0].id);
           }
         }
       }
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'Unknown network error';
       console.error('Failed to fetch endpoints from backend:', err);
-      setInitError(`Could not reach Hiccup chaos server (${msg}). Please verify your connection or refresh the page.`);
+      // If we have cached endpoints, don't show fatal error banner
+      const cached = loadCachedEndpoints();
+      if (cached.length === 0) {
+        setInitError(`Could not reach Hiccup chaos server (${msg}). Please verify your connection or refresh the page.`);
+      }
     } finally {
       setLoading(false);
     }
@@ -137,7 +196,11 @@ export default function App() {
       }
       const data = await res.json();
       if (data.success && data.endpoint) {
-        setEndpoints(prev => [data.endpoint, ...prev]);
+        setEndpoints(prev => {
+          const next = [data.endpoint, ...prev];
+          saveCachedEndpoints(next);
+          return next;
+        });
         setActiveEndpointId(data.endpoint.id);
         
         // Scroll to configurator
@@ -169,7 +232,11 @@ export default function App() {
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       const data = await res.json();
       if (data.success && data.endpoint) {
-        setEndpoints(prev => [data.endpoint, ...prev]);
+        setEndpoints(prev => {
+          const next = [data.endpoint, ...prev];
+          saveCachedEndpoints(next);
+          return next;
+        });
         setActiveEndpointId(data.endpoint.id);
 
         setTimeout(() => {
@@ -191,15 +258,24 @@ export default function App() {
   const handleUpdateFlakyPercentage = async (val: number) => {
     if (!activeEndpoint) return;
     try {
+      const extraHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (activeEndpoint.managementToken) {
+        extraHeaders['X-Management-Token'] = activeEndpoint.managementToken;
+        extraHeaders['X-Hiccup-Management-Token'] = activeEndpoint.managementToken;
+      }
       const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'PATCH',
-        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+        headers: getDefaultApiHeaders(extraHeaders),
         body: JSON.stringify({ flakyPercentage: val })
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.endpoint) {
-          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+          setEndpoints(prev => {
+            const next = prev.map(e => e.id === data.endpoint.id ? data.endpoint : e);
+            saveCachedEndpoints(next);
+            return next;
+          });
         }
       }
     } catch (err) {
@@ -213,15 +289,24 @@ export default function App() {
     const updatedRules = activeEndpoint.rules.map(r => r.id === ruleId ? { ...r, ...updated } : r);
 
     try {
+      const extraHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (activeEndpoint.managementToken) {
+        extraHeaders['X-Management-Token'] = activeEndpoint.managementToken;
+        extraHeaders['X-Hiccup-Management-Token'] = activeEndpoint.managementToken;
+      }
       const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'PATCH',
-        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+        headers: getDefaultApiHeaders(extraHeaders),
         body: JSON.stringify({ rules: updatedRules })
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.endpoint) {
-          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+          setEndpoints(prev => {
+            const next = prev.map(e => e.id === data.endpoint.id ? data.endpoint : e);
+            saveCachedEndpoints(next);
+            return next;
+          });
         }
       }
     } catch (err) {
@@ -233,15 +318,24 @@ export default function App() {
   const handleApplyPreset = async (presetId: string) => {
     if (!activeEndpoint) return;
     try {
+      const extraHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (activeEndpoint.managementToken) {
+        extraHeaders['X-Management-Token'] = activeEndpoint.managementToken;
+        extraHeaders['X-Hiccup-Management-Token'] = activeEndpoint.managementToken;
+      }
       const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}/apply-preset`), {
         method: 'POST',
-        headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+        headers: getDefaultApiHeaders(extraHeaders),
         body: JSON.stringify({ presetId })
       });
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.endpoint) {
-          setEndpoints(prev => prev.map(e => e.id === data.endpoint.id ? data.endpoint : e));
+          setEndpoints(prev => {
+            const next = prev.map(e => e.id === data.endpoint.id ? data.endpoint : e);
+            saveCachedEndpoints(next);
+            return next;
+          });
         }
       }
     } catch (err) {
@@ -274,13 +368,19 @@ export default function App() {
     if (!confirm(`Are you sure you want to delete endpoint '${activeEndpoint.name}'?`)) return;
 
     try {
+      const extraHeaders: Record<string, string> = {};
+      if (activeEndpoint.managementToken) {
+        extraHeaders['X-Management-Token'] = activeEndpoint.managementToken;
+        extraHeaders['X-Hiccup-Management-Token'] = activeEndpoint.managementToken;
+      }
       const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'DELETE',
-        headers: getDefaultApiHeaders()
+        headers: getDefaultApiHeaders(extraHeaders)
       });
       if (res.ok) {
         const remaining = endpoints.filter(e => e.id !== activeEndpoint.id);
         setEndpoints(remaining);
+        saveCachedEndpoints(remaining);
         if (remaining.length > 0) {
           setActiveEndpointId(remaining[0].id);
         }
@@ -326,14 +426,22 @@ export default function App() {
         <HeroSection
           endpoint={activeEndpoint}
           onGetChaosUrl={scrollToConfigurator}
+          onExplorePresets={() => setPresetModalOpen(true)}
           loading={loading}
         />
 
-        {/* 2. How It Works (3 steps) */}
+        {/* 2. 1-Click Real World Scenarios */}
+        <PresetBar
+          activeEndpoint={activeEndpoint}
+          onApplyPreset={handleApplyPreset}
+          onOpenAllPresets={() => setPresetModalOpen(true)}
+        />
+
+        {/* 3. How It Works (3 steps) */}
         <HowItWorks />
 
-        {/* 3. Endpoint & Chaos Configurator */}
-        <div ref={configuratorRef} className="space-y-6 pt-4">
+        {/* 4. Endpoint & Chaos Configurator */}
+        <div ref={configuratorRef} className="space-y-6 pt-2">
           {activeEndpoint ? (
             <div className="space-y-6">
               {/* Post-Creation Prominent Summary Card */}

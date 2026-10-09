@@ -177,7 +177,44 @@ async function runTests() {
     if (checkRes.status !== 404) throw new Error(`Expected 404 after deletion, got ${checkRes.status}`);
   });
 
-  // Summary
+  // 14. Sync/restore endpoint
+  await assert('POST /api/v1/endpoints/sync successfully restores session endpoints', async () => {
+    const syncSlug = `synced-ep-${Date.now().toString(36)}`;
+    const syncId = `ep-sync-${Date.now()}`;
+    const syncPayload = {
+      endpoints: [{
+        id: syncId,
+        slug: syncSlug,
+        name: 'Synced Endpoint Test',
+        isAnonymous: true,
+        ownerSessionId: testSessionId,
+        managementToken: `mgm_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        flakyPercentage: 50,
+        defaultResponseStatus: 200,
+        defaultResponseBody: '{"synced": true}',
+        rules: []
+      }]
+    };
+    const res = await fetch(`${BASE_URL}/api/v1/endpoints/sync`, {
+      method: 'POST',
+      headers: { ...testHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(syncPayload)
+    });
+    if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+    const data = await res.json();
+    if (!data.success || data.restoredCount < 1) throw new Error(`Failed to restore endpoint: ${JSON.stringify(data)}`);
+
+    // Verify it is reachable
+    const probeRes = await fetch(`${BASE_URL}/e/${syncSlug}`);
+    if (probeRes.status !== 200) throw new Error(`Synced endpoint not reachable: ${probeRes.status}`);
+
+    // Clean up
+    await fetch(`${BASE_URL}/api/v1/endpoints/${syncId}`, {
+      method: 'DELETE',
+      headers: testHeaders
+    });
+  });
   console.log(`\n========================================`);
   console.log(`🏁 Smoke Tests Complete: ${passed} Passed, ${failed} Failed`);
   console.log(`========================================\n`);

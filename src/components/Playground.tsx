@@ -28,7 +28,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
 }) => {
   const activeEndpoint = endpoints.find(e => e.id === activeEndpointId) || endpoints[0];
 
-  const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
+  const [method, setMethod] = useState<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD'>('GET');
   const [subpath, setSubpath] = useState('');
   const [headersText, setHeadersText] = useState('{\n  "Accept": "application/json"\n}');
   const [requestBodyText, setRequestBodyText] = useState('{\n  "test": "chaos_probe"\n}');
@@ -37,7 +37,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
   const [showBody, setShowBody] = useState(false);
   const [showResponseHeaders, setShowResponseHeaders] = useState(false);
   
-  const [snippetLang, setSnippetLang] = useState<'curl' | 'javascript' | 'python'>('curl');
+  const [snippetLang, setSnippetLang] = useState<'curl' | 'javascript' | 'axios' | 'python'>('curl');
   const [copiedSnippet, setCopiedSnippet] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -90,7 +90,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
         headers: customHeaders
       };
 
-      if ((method === 'POST' || method === 'PUT') && requestBodyText.trim()) {
+      if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && requestBodyText.trim()) {
         options.body = requestBodyText;
       }
 
@@ -242,13 +242,40 @@ export const Playground: React.FC<PlaygroundProps> = ({
       }
       return cmd;
     } else if (snippetLang === 'javascript') {
-      return `fetch("${fullTargetUrl}", {\n  method: "${method}",\n  headers: ${headersText || '{}'}${
-        method === 'POST' || method === 'PUT' ? `,\n  body: JSON.stringify(${requestBodyText || '{}'})` : ''
-      }\n})\n.then(res => res.json())\n.then(console.log)\n.catch(console.error);`;
+      return `// Native Fetch with error handling
+fetch("${fullTargetUrl}", {
+  method: "${method}",
+  headers: ${headersText || '{}'}${
+        method === 'POST' || method === 'PUT' || method === 'PATCH' ? `,\n  body: JSON.stringify(${requestBodyText || '{}'})` : ''
+      }
+})
+  .then(async (res) => {
+    if (!res.ok) throw new Error(\`HTTP \${res.status}: \${await res.text()}\`);
+    return res.json();
+  })
+  .then(data => console.log('Success:', data))
+  .catch(err => console.error('Caught Hiccup Chaos:', err.message));`;
+    } else if (snippetLang === 'axios') {
+      return `// Axios with explicit timeout & retry configuration
+import axios from 'axios';
+
+axios({
+  url: '${fullTargetUrl}',
+  method: '${method.toLowerCase()}',
+  headers: ${headersText || '{}'},
+  timeout: 3000, // 3s timeout to catch Hiccup hangs
+  ${(method === 'POST' || method === 'PUT' || method === 'PATCH') ? `data: ${requestBodyText || '{}'},` : ''}
+  validateStatus: (status) => status >= 200 && status < 300
+})
+  .then(res => console.log('Data:', res.data))
+  .catch(err => {
+    if (err.code === 'ECONNABORTED') console.error('Hiccup timeout triggered!');
+    else console.error('Hiccup error response:', err.response?.status, err.message);
+  });`;
     } else {
-      return `import requests\n\nurl = "${fullTargetUrl}"\nheaders = ${headersText || '{}'}\n\nresponse = requests.${method.toLowerCase()}(url, headers=headers${
-        method === 'POST' || method === 'PUT' ? `, json=${requestBodyText || '{}'}` : ''
-      })\nprint(response.status_code, response.text)`;
+      return `import requests\n\nurl = "${fullTargetUrl}"\nheaders = ${headersText || '{}'}\n\ntry:\n    response = requests.${method.toLowerCase()}(url, headers=headers${
+        method === 'POST' || method === 'PUT' || method === 'PATCH' ? `, json=${requestBodyText || '{}'}` : ''
+      }, timeout=5)\n    response.raise_for_status()\n    print(response.json())\nexcept requests.exceptions.RequestException as e:\n    print(f"Caught Hiccup chaos: {e}")`;
     }
   };
 
@@ -317,7 +344,9 @@ export const Playground: React.FC<PlaygroundProps> = ({
               <option value="GET">GET</option>
               <option value="POST">POST</option>
               <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
               <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
             </select>
 
             {/* Read-only URL + Subpath */}
@@ -542,7 +571,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
 
             {/* Language Switcher */}
             <div className="flex items-center space-x-1 bg-zinc-100 p-1 rounded-lg">
-              {(['curl', 'javascript', 'python'] as const).map((lang) => (
+              {(['curl', 'javascript', 'axios', 'python'] as const).map((lang) => (
                 <button
                   key={lang}
                   onClick={() => setSnippetLang(lang)}
@@ -552,7 +581,7 @@ export const Playground: React.FC<PlaygroundProps> = ({
                       : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
-                  {lang === 'curl' ? 'cURL' : lang === 'javascript' ? 'Fetch' : 'Python'}
+                  {lang === 'curl' ? 'cURL' : lang === 'javascript' ? 'Fetch' : lang === 'axios' ? 'Axios' : 'Python'}
                 </button>
               ))}
             </div>

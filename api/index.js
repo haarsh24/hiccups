@@ -188,11 +188,11 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, x-hiccup-behavior, x-faultline-behavior, *"
+    "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, X-Management-Token, X-Hiccup-Management-Token, x-hiccup-behavior, x-faultline-behavior, *"
   );
   res.header(
     "Access-Control-Expose-Headers",
-    "x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, *"
+    "x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, x-management-token, x-hiccup-management-token, *"
   );
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -222,16 +222,12 @@ function restoreState() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.endpoints)) {
         for (const ep of parsed.endpoints) {
-          if (!endpointsMap.has(ep.id)) {
-            endpointsMap.set(ep.id, ep);
-          }
+          endpointsMap.set(ep.id, ep);
         }
       }
       if (Array.isArray(parsed.slugs)) {
         for (const [slug, id] of parsed.slugs) {
-          if (!slugToIdMap.has(slug)) {
-            slugToIdMap.set(slug, id);
-          }
+          slugToIdMap.set(slug, id);
         }
       }
     }
@@ -412,7 +408,11 @@ app.get("/manus-routes.json", (req, res) => {
 app.all(["/e/:slug", "/e/:slug/*"], async (req, res) => {
   const startTime = Date.now();
   const slug = (req.params.slug || "").toLowerCase().trim();
-  const endpointId = slugToIdMap.get(slug);
+  let endpointId = slugToIdMap.get(slug);
+  if (!endpointId) {
+    restoreState();
+    endpointId = slugToIdMap.get(slug);
+  }
   const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   res.setHeader("X-Hiccup-Request-Id", requestId);
   if (!endpointId) {
@@ -427,7 +427,11 @@ app.all(["/e/:slug", "/e/:slug/*"], async (req, res) => {
       hint: "Create a new chaos endpoint at the Hiccups dashboard."
     });
   }
-  const endpoint = endpointsMap.get(endpointId);
+  let endpoint = endpointsMap.get(endpointId);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(endpointId);
+  }
   if (!endpoint) {
     res.setHeader("X-Hiccup-Behavior", "missing_config");
     res.setHeader("X-Faultline-Behavior", "missing_config");
@@ -879,6 +883,7 @@ app.get("/api/v1/check-slug", (req, res) => {
   res.json({ available: !isTaken, taken: isTaken });
 });
 app.get("/api/v1/endpoints", (req, res) => {
+  restoreState();
   const sessionId = getSessionId(req);
   const all = Array.from(endpointsMap.values());
   const filtered = all.filter((ep) => {
@@ -895,12 +900,38 @@ app.get("/api/v1/endpoints", (req, res) => {
   });
   res.json({ success: true, endpoints: sanitized });
 });
+app.post("/api/v1/endpoints/sync", (req, res) => {
+  const sessionId = getSessionId(req);
+  if (!sessionId) {
+    return res.status(400).json({ success: false, error: "Session ID required" });
+  }
+  const { endpoints: syncList } = req.body || {};
+  if (!Array.isArray(syncList)) {
+    return res.status(400).json({ success: false, error: "endpoints must be an array" });
+  }
+  let restoredCount = 0;
+  for (const ep of syncList) {
+    if (ep && ep.id && ep.slug && ep.ownerSessionId === sessionId) {
+      if (!endpointsMap.has(ep.id)) {
+        endpointsMap.set(ep.id, ep);
+        slugToIdMap.set(ep.slug.toLowerCase(), ep.id);
+        restoredCount++;
+      }
+    }
+  }
+  if (restoredCount > 0) {
+    persistState();
+  }
+  res.json({ success: true, restoredCount });
+});
 function authorizeEndpoint(req, endpoint) {
   if (endpoint.isDemo) {
     return { authorized: false, reason: "The demo endpoint is read-only. Create your own sandbox endpoint to edit rules." };
   }
   const sessionId = getSessionId(req);
-  const mgmHeader = req.headers["x-management-token"] || "";
+  const mgmHeader = req.headers["x-management-token"] || req.headers["x-hiccup-management-token"] || "";
+  const authHeader = req.headers["authorization"] || "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.replace("Bearer ", "").trim() : "";
   if (endpoint.ownerSessionId) {
     if (sessionId && endpoint.ownerSessionId === sessionId) {
       return { authorized: true };
@@ -908,19 +939,30 @@ function authorizeEndpoint(req, endpoint) {
     if (mgmHeader && endpoint.managementToken === mgmHeader) {
       return { authorized: true };
     }
+    if (bearerToken && endpoint.managementToken === bearerToken) {
+      return { authorized: true };
+    }
     return { authorized: false, reason: "Unauthorized: You do not own this endpoint." };
   }
   return { authorized: true };
 }
 app.get("/api/v1/endpoints/:id", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
   res.json({ success: true, endpoint });
 });
 app.patch("/api/v1/endpoints/:id", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
@@ -947,7 +989,11 @@ app.patch("/api/v1/endpoints/:id", (req, res) => {
   res.json({ success: true, endpoint });
 });
 app.delete("/api/v1/endpoints/:id", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
@@ -962,7 +1008,11 @@ app.delete("/api/v1/endpoints/:id", (req, res) => {
   res.json({ success: true, message: "Endpoint deleted successfully" });
 });
 app.post("/api/v1/endpoints/:id/apply-preset", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
@@ -982,7 +1032,11 @@ app.post("/api/v1/endpoints/:id/apply-preset", (req, res) => {
   res.json({ success: true, endpoint, message: `Applied preset '${preset.name}'` });
 });
 app.get("/api/v1/endpoints/:id/logs", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
@@ -990,7 +1044,11 @@ app.get("/api/v1/endpoints/:id/logs", (req, res) => {
   res.json({ success: true, logs });
 });
 app.delete("/api/v1/endpoints/:id/logs", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }
@@ -1002,7 +1060,11 @@ app.delete("/api/v1/endpoints/:id/logs", (req, res) => {
   res.json({ success: true, message: "Logs cleared" });
 });
 app.get("/api/v1/endpoints/:id/stats", (req, res) => {
-  const endpoint = endpointsMap.get(req.params.id);
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
   if (!endpoint) {
     return res.status(404).json({ success: false, error: "Endpoint not found" });
   }

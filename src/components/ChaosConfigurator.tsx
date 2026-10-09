@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Clock,
   AlertTriangle,
@@ -6,7 +6,9 @@ import {
   Hourglass,
   ShieldAlert,
   Gauge,
-  Sliders
+  Sliders,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { ChaosEndpoint, ChaosRule, BehaviorType } from '../types';
 
@@ -46,53 +48,70 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
   const rateLimitRule = getRule('rate_limit');
   const dripRule = getRule('drip');
 
+  const [isExpanded, setIsExpanded] = useState(true);
+  const activeCount = endpoint.rules.filter(r => r.enabled).length;
+
   return (
-    <div className="bg-white border border-zinc-200/90 rounded-2xl p-6 shadow-sm space-y-6">
+    <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 shadow-sm space-y-6">
       {/* Panel Header & Master Chaos Rate */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-zinc-200/80">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-200/80">
         <div>
           <div className="flex items-center space-x-2">
             <Sliders className="w-5 h-5 text-amber-600" />
             <h2 className="text-base font-bold text-zinc-900 font-sans">
               Chaos Rules & Behavior Profile
             </h2>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200">
+              {activeCount} active {activeCount === 1 ? 'rule' : 'rules'}
+            </span>
           </div>
           <p className="text-xs text-zinc-500 font-mono mt-0.5">
             Endpoint: <span className="text-zinc-800 font-semibold">/e/{endpoint?.slug || ''}</span>
           </p>
         </div>
 
-        {/* Master Chaos Slider */}
-        <div className="flex items-center space-x-4 bg-zinc-50 border border-zinc-200/80 rounded-xl px-4 py-2.5">
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs space-x-3">
-              <span className="text-zinc-600 font-medium">Global Chaos Rate</span>
-              <span className="font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 text-xs">
-                {endpoint.flakyPercentage}%
-              </span>
+        {/* Master Chaos Slider & Accordion Toggle */}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 bg-zinc-50 border border-zinc-200/80 rounded-xl px-3.5 py-2">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs space-x-2">
+                <span className="text-zinc-600 font-medium">Chaos Rate</span>
+                <span className="font-mono font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 text-[11px]">
+                  {endpoint.flakyPercentage}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={endpoint.flakyPercentage}
+                onChange={(e) => onUpdateFlakyPercentage(parseInt(e.target.value))}
+                className="w-28 sm:w-36 h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+              />
             </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={endpoint.flakyPercentage}
-              onChange={(e) => onUpdateFlakyPercentage(parseInt(e.target.value))}
-              className="w-36 h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
-            />
+
+            <button
+              onClick={onApplyPresetModal}
+              className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-100 px-2.5 py-1.5 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
+            >
+              Presets
+            </button>
           </div>
 
           <button
-            onClick={onApplyPresetModal}
-            className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-100 px-3 py-1.5 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
+            onClick={() => setIsExpanded(prev => !prev)}
+            className="p-2 rounded-xl border border-zinc-200 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 transition-colors flex items-center space-x-1 text-xs font-mono"
+            title={isExpanded ? 'Collapse rules configuration' : 'Expand rules configuration'}
           >
-            Presets
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Unified Misbehavior Rows Container */}
-      <div className="divide-y divide-zinc-200/70 space-y-0 font-mono text-xs">
+      {isExpanded ? (
+        /* Unified Misbehavior Rows Container */
+        <div className="divide-y divide-zinc-200/70 space-y-0 font-mono text-xs">
         
         {/* Row 1: Latency Injection */}
         {latencyRule && (
@@ -453,6 +472,17 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
         )}
 
       </div>
+      ) : (
+        <div className="text-center py-3 bg-zinc-50 rounded-xl border border-zinc-200/80 font-mono text-xs text-zinc-500 flex items-center justify-center space-x-2">
+          <span>Rules panel collapsed ({activeCount} active).</span>
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="text-amber-600 hover:text-amber-700 font-semibold underline"
+          >
+            Show knobs & sliders
+          </button>
+        </div>
+      )}
     </div>
   );
 };
