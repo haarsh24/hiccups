@@ -42,19 +42,20 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
   if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Vary', 'Origin');
   } else {
     res.header('Access-Control-Allow-Origin', '*');
+    // Notice: Do NOT set Access-Control-Allow-Credentials when Access-Control-Allow-Origin is '*'
   }
-  res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
   res.header(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, X-Management-Token, X-Hiccup-Management-Token, x-hiccup-behavior, x-faultline-behavior, *'
+    'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, X-Management-Token, X-Hiccup-Management-Token, x-hiccup-behavior, x-faultline-behavior'
   );
   res.header(
     'Access-Control-Expose-Headers',
-    'x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, x-management-token, x-hiccup-management-token, *'
+    'x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, x-management-token, x-hiccup-management-token'
   );
 
   // Fast preflight response for OPTIONS requests
@@ -70,40 +71,120 @@ const slugToIdMap = new Map<string, string>(); // slug -> endpoint id
 const logsMap = new Map<string, RequestLog[]>(); // endpoint id -> array of logs
 const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>(); // key: endpointId:clientIp
 const creationRateLimitMap = new Map<string, { count: number; resetAt: number }>(); // key: clientIp
+const deletedEndpointIds = new Set<string>(); // prevent resurrecting deleted endpoints on merge
 
-// Optional lightweight local disk cache to keep state warm across Vercel serverless cold starts
+// Multi-location storage engine: handles multi-process, Docker/VPS, and serverless environments
 const DATA_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'hiccups_state_store.json');
+const LOCAL_DATA_FILE = path.join(process.cwd(), '.data', 'hiccups_state_store.json');
 
-function persistState() {
-  try {
-    const data = {
-      endpoints: Array.from(endpointsMap.values()),
-      slugs: Array.from(slugToIdMap.entries())
-    };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data), 'utf-8');
-  } catch {
-    // Ignore error in read-only environments
+function getStorePaths(): string[] {
+  const list: string[] = [DATA_FILE];
+  if (!list.includes(LOCAL_DATA_FILE)) {
+    list.push(LOCAL_DATA_FILE);
   }
+  const tmpFallback = path.join(os.tmpdir(), 'hiccups_state_store.json');
+  if (!list.includes(tmpFallback)) {
+    list.push(tmpFallback);
+  }
+  return list;
 }
 
 function restoreState() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.endpoints)) {
-        for (const ep of parsed.endpoints) {
-          endpointsMap.set(ep.id, ep);
+  const candidatePaths = getStorePaths();
+  for (const filePath of candidatePaths) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.endpoints)) {
+          for (const ep of parsed.endpoints) {
+            if (ep && ep.id && !deletedEndpointIds.has(ep.id)) {
+              if (!endpointsMap.has(ep.id)) {
+                endpointsMap.set(ep.id, ep);
+              }
+              if (ep.slug) {
+                slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+              }
+            }
+          }
+        }
+        if (Array.isArray(parsed.slugs)) {
+          for (const [slug, id] of parsed.slugs) {
+            if (slug && id && !deletedEndpointIds.has(id)) {
+              slugToIdMap.set(slug.toLowerCase().trim(), id);
+            }
+          }
         }
       }
-      if (Array.isArray(parsed.slugs)) {
-        for (const [slug, id] of parsed.slugs) {
-          slugToIdMap.set(slug, id);
+    } catch {
+      // Ignore read errors
+    }
+  }
+
+  // Ensure demo endpoint is permanently seeded
+  endpointsMap.set(demoEndpoint.id, demoEndpoint);
+  slugToIdMap.set(demoSlug, demoEndpoint.id);
+  slugToIdMap.set('demo-flaky-api', demoEndpoint.id);
+}
+
+function persistState() {
+  try {
+    // 1. Read existing from all store files first and merge into memory before writing
+    // This prevents one process or serverless request from wiping endpoints saved by another!
+    const candidatePaths = getStorePaths();
+    for (const filePath of candidatePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          const raw = fs.readFileSync(filePath, 'utf-8');
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.endpoints)) {
+            for (const ep of parsed.endpoints) {
+              if (ep && ep.id && !deletedEndpointIds.has(ep.id)) {
+                if (!endpointsMap.has(ep.id)) {
+                  endpointsMap.set(ep.id, ep);
+                }
+                if (ep.slug) {
+                  slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+                }
+              }
+            }
+          }
         }
+      } catch {
+        // Ignore read errors
       }
     }
-  } catch {
-    // Ignore corrupt state file
+
+    // 2. Index all active non-deleted endpoints in slugToIdMap
+    for (const ep of endpointsMap.values()) {
+      if (ep.slug && !deletedEndpointIds.has(ep.id)) {
+        slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+      }
+    }
+
+    // 3. Serialize merged snapshot (excluding deleted endpoints)
+    const validEndpoints = Array.from(endpointsMap.values()).filter(ep => !deletedEndpointIds.has(ep.id));
+    const validSlugs = Array.from(slugToIdMap.entries()).filter(([_, id]) => !deletedEndpointIds.has(id));
+    const data = {
+      endpoints: validEndpoints,
+      slugs: validSlugs
+    };
+    const serialized = JSON.stringify(data, null, 2);
+
+    // 4. Write to all candidate writable paths
+    for (const filePath of candidatePaths) {
+      try {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(filePath, serialized, 'utf-8');
+      } catch {
+        // Ignore write error on read-only directories
+      }
+    }
+  } catch (err) {
+    console.error('Failed to persist state:', err);
   }
 }
 
@@ -315,6 +396,16 @@ app.all(['/e/:slug', '/e/:slug/*'], async (req: Request, res: Response) => {
   if (!endpointId) {
     restoreState();
     endpointId = slugToIdMap.get(slug);
+  }
+  // Secondary fallback: scan endpointsMap directly to find any match by slug
+  if (!endpointId) {
+    for (const ep of endpointsMap.values()) {
+      if (ep && ep.slug && ep.slug.toLowerCase().trim() === slug) {
+        endpointId = ep.id;
+        slugToIdMap.set(slug, ep.id);
+        break;
+      }
+    }
   }
   const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -745,6 +836,7 @@ function checkCreationRateLimit(clientIp: string): boolean {
 
 // Create Instant 24-Hour Sandbox Endpoint
 app.post('/api/v1/playground', (req: Request, res: Response) => {
+  restoreState();
   const clientIp = getClientIp(req);
   if (!checkCreationRateLimit(clientIp)) {
     return res.status(429).json({ success: false, error: "Rate limit exceeded. Please wait a minute before creating more endpoints." });
@@ -792,7 +884,7 @@ app.post('/api/v1/playground', (req: Request, res: Response) => {
   };
 
   endpointsMap.set(newEndpoint.id, newEndpoint);
-  slugToIdMap.set(customSlug, newEndpoint.id);
+  slugToIdMap.set(customSlug.toLowerCase().trim(), newEndpoint.id);
   logsMap.set(newEndpoint.id, []);
   persistState();
 
@@ -801,6 +893,7 @@ app.post('/api/v1/playground', (req: Request, res: Response) => {
 
 // Create Named / Persistent Endpoint
 app.post('/api/v1/endpoints', (req: Request, res: Response) => {
+  restoreState();
   const clientIp = getClientIp(req);
   if (!checkCreationRateLimit(clientIp)) {
     return res.status(429).json({ success: false, error: "Rate limit exceeded. Please wait a minute before creating more endpoints." });
@@ -862,7 +955,7 @@ app.post('/api/v1/endpoints', (req: Request, res: Response) => {
   };
 
   endpointsMap.set(newEndpoint.id, newEndpoint);
-  slugToIdMap.set(slug, newEndpoint.id);
+  slugToIdMap.set(slug.toLowerCase().trim(), newEndpoint.id);
   logsMap.set(newEndpoint.id, []);
   persistState();
 
@@ -871,6 +964,7 @@ app.post('/api/v1/endpoints', (req: Request, res: Response) => {
 
 // Check if a Custom Slug is Available
 app.get('/api/v1/check-slug', (req: Request, res: Response) => {
+  restoreState();
   const rawSlug = (req.query.slug as string || '').toLowerCase().trim();
   if (!rawSlug) {
     return res.json({ available: false, error: "Slug cannot be empty" });
@@ -914,10 +1008,8 @@ app.get('/api/v1/endpoints', (req: Request, res: Response) => {
 
 // Sync/Restore Endpoints from Authorized Session (Multi-container & Serverless resilience)
 app.post('/api/v1/endpoints/sync', (req: Request, res: Response) => {
+  restoreState();
   const sessionId = getSessionId(req);
-  if (!sessionId) {
-    return res.status(400).json({ success: false, error: "Session ID required" });
-  }
 
   const { endpoints: syncList } = req.body || {};
   if (!Array.isArray(syncList)) {
@@ -926,11 +1018,27 @@ app.post('/api/v1/endpoints/sync', (req: Request, res: Response) => {
 
   let restoredCount = 0;
   for (const ep of syncList) {
-    if (ep && ep.id && ep.slug && ep.ownerSessionId === sessionId) {
-      if (!endpointsMap.has(ep.id)) {
-        endpointsMap.set(ep.id, ep);
-        slugToIdMap.set(ep.slug.toLowerCase(), ep.id);
+    if (ep && ep.id && ep.slug) {
+      const cleanSlug = ep.slug.toLowerCase().trim();
+      const existing = endpointsMap.get(ep.id);
+      if (!existing) {
+        endpointsMap.set(ep.id, {
+          ...ep,
+          slug: cleanSlug,
+          ownerSessionId: ep.ownerSessionId || sessionId || undefined
+        });
+        slugToIdMap.set(cleanSlug, ep.id);
         restoredCount++;
+      } else {
+        // Update rules/configuration if caller owns it or if ownerSessionId was unset
+        if (!existing.ownerSessionId || (sessionId && existing.ownerSessionId === sessionId)) {
+          if (Array.isArray(ep.rules)) existing.rules = ep.rules;
+          if (ep.flakyPercentage !== undefined) existing.flakyPercentage = ep.flakyPercentage;
+          if (ep.name) existing.name = ep.name;
+          endpointsMap.set(existing.id, existing);
+          slugToIdMap.set(cleanSlug, existing.id);
+          restoredCount++;
+        }
       }
     }
   }
@@ -1020,6 +1128,48 @@ app.patch('/api/v1/endpoints/:id', (req: Request, res: Response) => {
   res.json({ success: true, endpoint });
 });
 
+// Update Specific Chaos Rule on Endpoint
+app.patch('/api/v1/endpoints/:id/rules/:ruleId', (req: Request, res: Response) => {
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
+  if (!endpoint) {
+    return res.status(404).json({ success: false, error: "Endpoint not found" });
+  }
+
+  const auth = authorizeEndpoint(req, endpoint);
+  if (!auth.authorized) {
+    return res.status(403).json({ success: false, error: auth.reason });
+  }
+
+  const ruleIdParam = req.params.ruleId;
+  const rule = endpoint.rules.find(r => r.id === ruleIdParam || r.type === ruleIdParam);
+  if (!rule) {
+    return res.status(404).json({ success: false, error: `Rule '${ruleIdParam}' not found on endpoint` });
+  }
+
+  const { enabled, probability, params } = req.body || {};
+
+  if (enabled !== undefined) {
+    rule.enabled = Boolean(enabled);
+  }
+  if (probability !== undefined) {
+    rule.probability = Math.min(1.0, Math.max(0, Number(probability)));
+  }
+  if (params && typeof params === 'object') {
+    rule.params = {
+      ...rule.params,
+      ...params
+    };
+  }
+
+  endpointsMap.set(endpoint.id, endpoint);
+  persistState();
+  res.json({ success: true, endpoint, rule });
+});
+
 // Delete Endpoint
 app.delete('/api/v1/endpoints/:id', (req: Request, res: Response) => {
   let endpoint = endpointsMap.get(req.params.id);
@@ -1036,6 +1186,8 @@ app.delete('/api/v1/endpoints/:id', (req: Request, res: Response) => {
     return res.status(403).json({ success: false, error: auth.reason });
   }
 
+  deletedEndpointIds.add(endpoint.id);
+  slugToIdMap.delete(endpoint.slug.toLowerCase().trim());
   slugToIdMap.delete(endpoint.slug);
   endpointsMap.delete(endpoint.id);
   logsMap.delete(endpoint.id);

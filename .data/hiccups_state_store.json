@@ -1,0 +1,982 @@
+{
+  "endpoints": [
+    {
+      "id": "ep-demo-chaos",
+      "slug": "demo-chaos",
+      "name": "Demo Chaos Endpoint",
+      "isAnonymous": false,
+      "isDemo": true,
+      "createdAt": "2026-10-11T18:16:15.688Z",
+      "expiresAt": null,
+      "flakyPercentage": 50,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"ok\",\n  \"message\": \"Hello from Hiccups! This endpoint was reached successfully without chaos.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742575689",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742575689",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742575689",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742575689",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742575689",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742575689",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791741591257-7pmi",
+      "slug": "unstable-node-23",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791741591123",
+      "managementToken": "mgm_1791741591257_98z3r7kw",
+      "createdAt": "2026-10-11T17:59:51.257Z",
+      "expiresAt": "2026-10-12T17:59:51.257Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791741591257",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791741591257",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791741591257",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791741591257",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791741591257",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791741591257",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791742219270-busy",
+      "slug": "ghostly-node-10",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791742219119",
+      "managementToken": "mgm_1791742219270_xdq9z1pu",
+      "createdAt": "2026-10-11T18:10:19.270Z",
+      "expiresAt": "2026-10-12T18:10:19.270Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742219270",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742219270",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742219270",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742219270",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742219270",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742219270",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791742219298-p5h9",
+      "slug": "test-resilience-mv4520i2",
+      "name": "Automated Test API",
+      "isAnonymous": false,
+      "ownerSessionId": "test_session_1791742219119",
+      "managementToken": "mgm_1791742219298_n7v0mhkc",
+      "createdAt": "2026-10-11T18:10:19.298Z",
+      "expiresAt": null,
+      "flakyPercentage": 40,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Normal response from Hiccups chaos endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.8,
+          "params": {
+            "latency": {
+              "minMs": 800,
+              "maxMs": 2500,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.5,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"PAYMENT_GATEWAY_TIMEOUT\",\n  \"retryable\": true\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-sync-1791742220314",
+      "slug": "synced-ep-mv4521ay",
+      "name": "Synced Endpoint Test",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791742219119",
+      "managementToken": "mgm_1791742220314",
+      "createdAt": "2026-10-11T18:10:20.314Z",
+      "flakyPercentage": 50,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\"synced\": true}",
+      "rules": []
+    },
+    {
+      "id": "ep-1791742220331-yuxl",
+      "slug": "choppy-wave-37",
+      "name": "Rule Patch Test API",
+      "isAnonymous": false,
+      "ownerSessionId": "test_session_1791742219119",
+      "managementToken": "mgm_1791742220331_nuxh2cmg",
+      "createdAt": "2026-10-11T18:10:20.331Z",
+      "expiresAt": null,
+      "flakyPercentage": 50,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Normal response from Hiccups chaos endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742220331",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 200,
+              "maxMs": 1000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742220331",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742220331",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742220331",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742220331",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742220331",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791742268255-butn",
+      "slug": "turbulent-node-98",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791742267199",
+      "managementToken": "mgm_1791742268255_6njhgvkx",
+      "createdAt": "2026-10-11T18:11:08.255Z",
+      "expiresAt": "2026-10-12T18:11:08.255Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742268255",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742268255",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742268255",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742268255",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742268255",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742268255",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791574662447-a5e5",
+      "slug": "rocky-channel-39",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "managementToken": "mgm_1791574662447_24629lpn",
+      "createdAt": "2026-10-09T19:37:42.447Z",
+      "expiresAt": "2026-10-10T19:37:42.447Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791574662447",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791574662447",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791574662447",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791574662447",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791574662447",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791574662447",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ],
+      "ownerSessionId": "sess_1791570476374_kr8m4w5tbf"
+    },
+    {
+      "id": "ep-1791574669868-4pt5",
+      "slug": "unstable-wave-11",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "managementToken": "mgm_1791574669868_cionzanf",
+      "createdAt": "2026-10-09T19:37:49.868Z",
+      "expiresAt": "2026-10-10T19:37:49.868Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791574669868",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791574669868",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791574669868",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791574669868",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791574669868",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791574669868",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ],
+      "ownerSessionId": "sess_1791570476374_kr8m4w5tbf"
+    },
+    {
+      "id": "ep-1791574692026-rk59",
+      "slug": "jittery-node-71",
+      "name": "Sandbox (Flaky Payment Gateway)",
+      "isAnonymous": true,
+      "managementToken": "mgm_1791574692026_j7f9hkx9",
+      "createdAt": "2026-10-09T19:38:12.026Z",
+      "expiresAt": "2026-10-10T19:38:12.026Z",
+      "flakyPercentage": 75,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-drop-1",
+          "type": "drop",
+          "enabled": true,
+          "probability": 1,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        }
+      ],
+      "ownerSessionId": "sess_1791570476374_kr8m4w5tbf"
+    },
+    {
+      "id": "ep-1791575312218-wh0z",
+      "slug": "flaky-wave-47",
+      "name": "Sandbox (Flaky Payment Gateway)",
+      "isAnonymous": true,
+      "managementToken": "mgm_1791575312218_dj59y4qg",
+      "createdAt": "2026-10-09T19:48:32.218Z",
+      "expiresAt": "2026-10-10T19:48:32.218Z",
+      "flakyPercentage": 40,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.8,
+          "params": {
+            "latency": {
+              "minMs": 800,
+              "maxMs": 2500,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.5,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"PAYMENT_GATEWAY_TIMEOUT\",\n  \"retryable\": true\n}"
+            }
+          }
+        }
+      ],
+      "ownerSessionId": "sess_1791570476374_kr8m4w5tbf"
+    },
+    {
+      "id": "ep-1791742552209-0r5p",
+      "slug": "ghostly-channel-82",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791742550964",
+      "managementToken": "mgm_1791742552209_gz1bu90c",
+      "createdAt": "2026-10-11T18:15:52.209Z",
+      "expiresAt": "2026-10-12T18:15:52.209Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742552209",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742552209",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742552209",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742552209",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742552209",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742552209",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ep-1791742696310-ezzj",
+      "slug": "flaky-stream-48",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791742694635",
+      "managementToken": "mgm_1791742696310_cz3gmepo",
+      "createdAt": "2026-10-11T18:18:16.310Z",
+      "expiresAt": "2026-10-12T18:18:16.310Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791742696310",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791742696310",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791742696310",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791742696310",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791742696310",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791742696310",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "slugs": [
+    [
+      "demo-chaos",
+      "ep-demo-chaos"
+    ],
+    [
+      "demo-flaky-api",
+      "ep-demo-chaos"
+    ],
+    [
+      "unstable-node-23",
+      "ep-1791741591257-7pmi"
+    ],
+    [
+      "ghostly-node-10",
+      "ep-1791742219270-busy"
+    ],
+    [
+      "test-resilience-mv4520i2",
+      "ep-1791742219298-p5h9"
+    ],
+    [
+      "synced-ep-mv4521ay",
+      "ep-sync-1791742220314"
+    ],
+    [
+      "choppy-wave-37",
+      "ep-1791742220331-yuxl"
+    ],
+    [
+      "turbulent-node-98",
+      "ep-1791742268255-butn"
+    ],
+    [
+      "rocky-channel-39",
+      "ep-1791574662447-a5e5"
+    ],
+    [
+      "unstable-wave-11",
+      "ep-1791574669868-4pt5"
+    ],
+    [
+      "jittery-node-71",
+      "ep-1791574692026-rk59"
+    ],
+    [
+      "flaky-wave-47",
+      "ep-1791575312218-wh0z"
+    ],
+    [
+      "ghostly-channel-82",
+      "ep-1791742552209-0r5p"
+    ],
+    [
+      "flaky-stream-48",
+      "ep-1791742696310-ezzj"
+    ]
+  ]
+}

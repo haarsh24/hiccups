@@ -16,6 +16,7 @@ import { PresetModal } from './components/PresetModal';
 import { NewEndpointModal } from './components/NewEndpointModal';
 import { DocsModal } from './components/DocsModal';
 import { Playground } from './components/Playground';
+import { Footer } from './components/Footer';
 import { Activity, ChevronDown, ChevronUp, Terminal, Play, AlertCircle, RefreshCw, ArrowUp, CheckCircle2 } from 'lucide-react';
 import { getApiUrl, getDefaultApiHeaders } from './lib/config';
 
@@ -227,7 +228,10 @@ export default function App() {
         headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ name, customSlug, presetId })
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status} ${res.statusText}`);
+      }
       const data = await res.json();
       if (data.success && data.endpoint) {
         setEndpoints(prev => {
@@ -238,9 +242,19 @@ export default function App() {
         setActiveEndpointId(data.endpoint.id);
         setToastMessage(`Created endpoint: /e/${data.endpoint.slug}`);
         setTimeout(() => setToastMessage(null), 4000);
+
+        // Sync with backend to ensure warm state across all instances
+        fetch(getApiUrl('/api/v1/endpoints/sync'), {
+          method: 'POST',
+          headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ endpoints: [data.endpoint] })
+        }).catch(() => {});
       }
     } catch (err) {
+      const msg = (err as Error)?.message || 'Failed to create custom named endpoint';
       console.error('Failed to create custom named endpoint:', err);
+      setToastMessage(`Creation failed: ${msg}`);
+      setTimeout(() => setToastMessage(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -255,6 +269,15 @@ export default function App() {
         extraHeaders['X-Management-Token'] = activeEndpoint.managementToken;
         extraHeaders['X-Hiccup-Management-Token'] = activeEndpoint.managementToken;
       }
+
+      // Optimistic update
+      const updatedEndpoint = { ...activeEndpoint, flakyPercentage: val };
+      setEndpoints(prev => {
+        const next = prev.map(e => e.id === updatedEndpoint.id ? updatedEndpoint : e);
+        saveCachedEndpoints(next);
+        return next;
+      });
+
       const res = await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
         method: 'PATCH',
         headers: getDefaultApiHeaders(extraHeaders),
@@ -278,6 +301,30 @@ export default function App() {
   // Update Single Chaos Rule
   const handleUpdateRule = async (ruleId: string, updated: Partial<ChaosRule>) => {
     if (!activeEndpoint) return;
+
+    // 1. Optimistic update: immediately reflect changes in memory and localStorage so UI never snaps back
+    const updatedRules = activeEndpoint.rules.map(r => {
+      if (r.id === ruleId || r.type === ruleId) {
+        return {
+          ...r,
+          ...updated,
+          params: updated.params ? { ...r.params, ...updated.params } : r.params
+        };
+      }
+      return r;
+    });
+
+    const updatedEndpoint: ChaosEndpoint = {
+      ...activeEndpoint,
+      rules: updatedRules
+    };
+
+    setEndpoints(prev => {
+      const next = prev.map(e => e.id === updatedEndpoint.id ? updatedEndpoint : e);
+      saveCachedEndpoints(next);
+      return next;
+    });
+
     try {
       const extraHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (activeEndpoint.managementToken) {
@@ -298,6 +345,13 @@ export default function App() {
             return next;
           });
         }
+      } else {
+        // Fallback: try PATCH /api/v1/endpoints/:id with full rules array
+        await fetch(getApiUrl(`/api/v1/endpoints/${encodeURIComponent(activeEndpoint.id)}`), {
+          method: 'PATCH',
+          headers: getDefaultApiHeaders(extraHeaders),
+          body: JSON.stringify({ rules: updatedRules })
+        });
       }
     } catch (err) {
       console.error('Failed to update rule:', err);
@@ -635,6 +689,14 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <Footer
+        onOpenDocs={() => setDocsModalOpen(true)}
+        onOpenPresets={() => setPresetModalOpen(true)}
+        onScrollToPlayground={scrollToPlayground}
+        onScrollToConfigurator={scrollToConfigurator}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

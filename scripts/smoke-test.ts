@@ -215,6 +215,56 @@ async function runTests() {
       headers: testHeaders
     });
   });
+
+  // 15. PATCH rule parameters directly (Defect 4 verification)
+  await assert('PATCH /api/v1/endpoints/:id/rules/:ruleId updates numeric latency params', async () => {
+    // Create an endpoint to test rule patching
+    const createRes = await fetch(`${BASE_URL}/api/v1/endpoints`, {
+      method: 'POST',
+      headers: { ...testHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Rule Patch Test API' })
+    });
+    const createData = await createRes.json();
+    const epId = createData.endpoint.id;
+    const latencyRule = createData.endpoint.rules.find((r: any) => r.type === 'latency');
+    if (!latencyRule) throw new Error('Endpoint missing latency rule');
+
+    // Patch maxMs to 1000
+    const patchRes = await fetch(`${BASE_URL}/api/v1/endpoints/${epId}/rules/${latencyRule.id}`, {
+      method: 'PATCH',
+      headers: { ...testHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        params: {
+          latency: { minMs: 200, maxMs: 1000, jitter: true }
+        }
+      })
+    });
+    if (patchRes.status !== 200) throw new Error(`Expected 200 for rule PATCH, got ${patchRes.status}`);
+    const patchData = await patchRes.json();
+    if (!patchData.success || patchData.rule.params.latency.maxMs !== 1000) {
+      throw new Error(`Rule maxMs was not updated to 1000: ${JSON.stringify(patchData)}`);
+    }
+
+    // Verify persisted by fetching endpoint again
+    const verifyRes = await fetch(`${BASE_URL}/api/v1/endpoints/${epId}`, { headers: testHeaders });
+    const verifyData = await verifyRes.json();
+    const updatedRule = verifyData.endpoint.rules.find((r: any) => r.id === latencyRule.id);
+    if (updatedRule.params.latency.maxMs !== 1000) {
+      throw new Error(`Persisted maxMs did not remain 1000, got ${updatedRule.params.latency.maxMs}`);
+    }
+
+    // Clean up
+    await fetch(`${BASE_URL}/api/v1/endpoints/${epId}`, { method: 'DELETE', headers: testHeaders });
+  });
+
+  // 16. Secure CORS policy check (Wildcard does not allow credentials)
+  await assert('CORS without Origin header returns * without credentials', async () => {
+    const res = await fetch(`${BASE_URL}/health`);
+    const allowOrigin = res.headers.get('access-control-allow-origin');
+    const allowCreds = res.headers.get('access-control-allow-credentials');
+    if (allowOrigin !== '*') throw new Error(`Expected allow-origin *, got ${allowOrigin}`);
+    if (allowCreds === 'true') throw new Error('Security defect: credentials must NOT be allowed when origin is *');
+  });
   console.log(`\n========================================`);
   console.log(`🏁 Smoke Tests Complete: ${passed} Passed, ${failed} Failed`);
   console.log(`========================================\n`);

@@ -218,19 +218,19 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
     res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
     res.header("Vary", "Origin");
   } else {
     res.header("Access-Control-Allow-Origin", "*");
   }
-  res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, X-Management-Token, X-Hiccup-Management-Token, x-hiccup-behavior, x-faultline-behavior, *"
+    "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Hiccup-Test-Client, X-Hiccup-Session-Id, X-Management-Token, X-Hiccup-Management-Token, x-hiccup-behavior, x-faultline-behavior"
   );
   res.header(
     "Access-Control-Expose-Headers",
-    "x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, x-management-token, x-hiccup-management-token, *"
+    "x-hiccup-behavior, x-hiccup-request-id, x-faultline-behavior, retry-after, content-length, content-type, x-management-token, x-hiccup-management-token"
   );
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -242,34 +242,102 @@ var slugToIdMap = /* @__PURE__ */ new Map();
 var logsMap = /* @__PURE__ */ new Map();
 var rateLimitMap = /* @__PURE__ */ new Map();
 var creationRateLimitMap = /* @__PURE__ */ new Map();
+var deletedEndpointIds = /* @__PURE__ */ new Set();
 var DATA_FILE = import_path.default.join(process.env.DATA_DIR || import_os.default.tmpdir(), "hiccups_state_store.json");
-function persistState() {
-  try {
-    const data = {
-      endpoints: Array.from(endpointsMap.values()),
-      slugs: Array.from(slugToIdMap.entries())
-    };
-    import_fs.default.writeFileSync(DATA_FILE, JSON.stringify(data), "utf-8");
-  } catch {
+var LOCAL_DATA_FILE = import_path.default.join(process.cwd(), ".data", "hiccups_state_store.json");
+function getStorePaths() {
+  const list = [DATA_FILE];
+  if (!list.includes(LOCAL_DATA_FILE)) {
+    list.push(LOCAL_DATA_FILE);
   }
+  const tmpFallback = import_path.default.join(import_os.default.tmpdir(), "hiccups_state_store.json");
+  if (!list.includes(tmpFallback)) {
+    list.push(tmpFallback);
+  }
+  return list;
 }
 function restoreState() {
-  try {
-    if (import_fs.default.existsSync(DATA_FILE)) {
-      const raw = import_fs.default.readFileSync(DATA_FILE, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.endpoints)) {
-        for (const ep of parsed.endpoints) {
-          endpointsMap.set(ep.id, ep);
+  const candidatePaths = getStorePaths();
+  for (const filePath of candidatePaths) {
+    try {
+      if (import_fs.default.existsSync(filePath)) {
+        const raw = import_fs.default.readFileSync(filePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.endpoints)) {
+          for (const ep of parsed.endpoints) {
+            if (ep && ep.id && !deletedEndpointIds.has(ep.id)) {
+              if (!endpointsMap.has(ep.id)) {
+                endpointsMap.set(ep.id, ep);
+              }
+              if (ep.slug) {
+                slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+              }
+            }
+          }
+        }
+        if (Array.isArray(parsed.slugs)) {
+          for (const [slug, id] of parsed.slugs) {
+            if (slug && id && !deletedEndpointIds.has(id)) {
+              slugToIdMap.set(slug.toLowerCase().trim(), id);
+            }
+          }
         }
       }
-      if (Array.isArray(parsed.slugs)) {
-        for (const [slug, id] of parsed.slugs) {
-          slugToIdMap.set(slug, id);
+    } catch {
+    }
+  }
+  endpointsMap.set(demoEndpoint.id, demoEndpoint);
+  slugToIdMap.set(demoSlug, demoEndpoint.id);
+  slugToIdMap.set("demo-flaky-api", demoEndpoint.id);
+}
+function persistState() {
+  try {
+    const candidatePaths = getStorePaths();
+    for (const filePath of candidatePaths) {
+      try {
+        if (import_fs.default.existsSync(filePath)) {
+          const raw = import_fs.default.readFileSync(filePath, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.endpoints)) {
+            for (const ep of parsed.endpoints) {
+              if (ep && ep.id && !deletedEndpointIds.has(ep.id)) {
+                if (!endpointsMap.has(ep.id)) {
+                  endpointsMap.set(ep.id, ep);
+                }
+                if (ep.slug) {
+                  slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+                }
+              }
+            }
+          }
         }
+      } catch {
       }
     }
-  } catch {
+    for (const ep of endpointsMap.values()) {
+      if (ep.slug && !deletedEndpointIds.has(ep.id)) {
+        slugToIdMap.set(ep.slug.toLowerCase().trim(), ep.id);
+      }
+    }
+    const validEndpoints = Array.from(endpointsMap.values()).filter((ep) => !deletedEndpointIds.has(ep.id));
+    const validSlugs = Array.from(slugToIdMap.entries()).filter(([_, id]) => !deletedEndpointIds.has(id));
+    const data = {
+      endpoints: validEndpoints,
+      slugs: validSlugs
+    };
+    const serialized = JSON.stringify(data, null, 2);
+    for (const filePath of candidatePaths) {
+      try {
+        const dir = import_path.default.dirname(filePath);
+        if (!import_fs.default.existsSync(dir)) {
+          import_fs.default.mkdirSync(dir, { recursive: true });
+        }
+        import_fs.default.writeFileSync(filePath, serialized, "utf-8");
+      } catch {
+      }
+    }
+  } catch (err) {
+    console.error("Failed to persist state:", err);
   }
 }
 var RESERVED_SLUGS = /* @__PURE__ */ new Set([
@@ -450,6 +518,15 @@ app.all(["/e/:slug", "/e/:slug/*"], async (req, res) => {
   if (!endpointId) {
     restoreState();
     endpointId = slugToIdMap.get(slug);
+  }
+  if (!endpointId) {
+    for (const ep of endpointsMap.values()) {
+      if (ep && ep.slug && ep.slug.toLowerCase().trim() === slug) {
+        endpointId = ep.id;
+        slugToIdMap.set(slug, ep.id);
+        break;
+      }
+    }
   }
   const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   res.setHeader("X-Hiccup-Request-Id", requestId);
@@ -810,6 +887,7 @@ function checkCreationRateLimit(clientIp) {
   return true;
 }
 app.post("/api/v1/playground", (req, res) => {
+  restoreState();
   const clientIp = getClientIp(req);
   if (!checkCreationRateLimit(clientIp)) {
     return res.status(429).json({ success: false, error: "Rate limit exceeded. Please wait a minute before creating more endpoints." });
@@ -819,33 +897,46 @@ app.post("/api/v1/playground", (req, res) => {
   while (slugToIdMap.has(customSlug) || RESERVED_SLUGS.has(customSlug)) {
     customSlug = generateSlug();
   }
+  const { presetId } = req.body || {};
+  let rules = createDefaultRules();
+  let flakyPercentage = 60;
+  let endpointName = "24h Quick Sandbox";
+  if (presetId) {
+    const preset = PRESET_PROFILES.find((p) => p.id === presetId);
+    if (preset) {
+      rules = JSON.parse(JSON.stringify(preset.rules));
+      flakyPercentage = preset.flakyPercentage;
+      endpointName = `Sandbox (${preset.name})`;
+    }
+  }
   const managementToken = `mgm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
   const newEndpoint = {
     id: `ep-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     slug: customSlug,
-    name: "24h Quick Sandbox",
+    name: endpointName,
     isAnonymous: true,
     ownerSessionId: sessionId || void 0,
     managementToken,
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1e3).toISOString(),
     // 24 hours TTL
-    flakyPercentage: 60,
+    flakyPercentage,
     defaultResponseStatus: 200,
     defaultResponseBody: JSON.stringify(
       { status: "success", data: "Clean response from your Hiccups sandbox endpoint." },
       null,
       2
     ),
-    rules: createDefaultRules()
+    rules
   };
   endpointsMap.set(newEndpoint.id, newEndpoint);
-  slugToIdMap.set(customSlug, newEndpoint.id);
+  slugToIdMap.set(customSlug.toLowerCase().trim(), newEndpoint.id);
   logsMap.set(newEndpoint.id, []);
   persistState();
   res.status(201).json({ success: true, endpoint: newEndpoint });
 });
 app.post("/api/v1/endpoints", (req, res) => {
+  restoreState();
   const clientIp = getClientIp(req);
   if (!checkCreationRateLimit(clientIp)) {
     return res.status(429).json({ success: false, error: "Rate limit exceeded. Please wait a minute before creating more endpoints." });
@@ -901,12 +992,13 @@ app.post("/api/v1/endpoints", (req, res) => {
     rules
   };
   endpointsMap.set(newEndpoint.id, newEndpoint);
-  slugToIdMap.set(slug, newEndpoint.id);
+  slugToIdMap.set(slug.toLowerCase().trim(), newEndpoint.id);
   logsMap.set(newEndpoint.id, []);
   persistState();
   res.status(201).json({ success: true, endpoint: newEndpoint });
 });
 app.get("/api/v1/check-slug", (req, res) => {
+  restoreState();
   const rawSlug = (req.query.slug || "").toLowerCase().trim();
   if (!rawSlug) {
     return res.json({ available: false, error: "Slug cannot be empty" });
@@ -939,21 +1031,34 @@ app.get("/api/v1/endpoints", (req, res) => {
   res.json({ success: true, endpoints: sanitized });
 });
 app.post("/api/v1/endpoints/sync", (req, res) => {
+  restoreState();
   const sessionId = getSessionId(req);
-  if (!sessionId) {
-    return res.status(400).json({ success: false, error: "Session ID required" });
-  }
   const { endpoints: syncList } = req.body || {};
   if (!Array.isArray(syncList)) {
     return res.status(400).json({ success: false, error: "endpoints must be an array" });
   }
   let restoredCount = 0;
   for (const ep of syncList) {
-    if (ep && ep.id && ep.slug && ep.ownerSessionId === sessionId) {
-      if (!endpointsMap.has(ep.id)) {
-        endpointsMap.set(ep.id, ep);
-        slugToIdMap.set(ep.slug.toLowerCase(), ep.id);
+    if (ep && ep.id && ep.slug) {
+      const cleanSlug = ep.slug.toLowerCase().trim();
+      const existing = endpointsMap.get(ep.id);
+      if (!existing) {
+        endpointsMap.set(ep.id, {
+          ...ep,
+          slug: cleanSlug,
+          ownerSessionId: ep.ownerSessionId || sessionId || void 0
+        });
+        slugToIdMap.set(cleanSlug, ep.id);
         restoredCount++;
+      } else {
+        if (!existing.ownerSessionId || sessionId && existing.ownerSessionId === sessionId) {
+          if (Array.isArray(ep.rules)) existing.rules = ep.rules;
+          if (ep.flakyPercentage !== void 0) existing.flakyPercentage = ep.flakyPercentage;
+          if (ep.name) existing.name = ep.name;
+          endpointsMap.set(existing.id, existing);
+          slugToIdMap.set(cleanSlug, existing.id);
+          restoredCount++;
+        }
       }
     }
   }
@@ -1026,6 +1131,41 @@ app.patch("/api/v1/endpoints/:id", (req, res) => {
   persistState();
   res.json({ success: true, endpoint });
 });
+app.patch("/api/v1/endpoints/:id/rules/:ruleId", (req, res) => {
+  let endpoint = endpointsMap.get(req.params.id);
+  if (!endpoint) {
+    restoreState();
+    endpoint = endpointsMap.get(req.params.id);
+  }
+  if (!endpoint) {
+    return res.status(404).json({ success: false, error: "Endpoint not found" });
+  }
+  const auth = authorizeEndpoint(req, endpoint);
+  if (!auth.authorized) {
+    return res.status(403).json({ success: false, error: auth.reason });
+  }
+  const ruleIdParam = req.params.ruleId;
+  const rule = endpoint.rules.find((r) => r.id === ruleIdParam || r.type === ruleIdParam);
+  if (!rule) {
+    return res.status(404).json({ success: false, error: `Rule '${ruleIdParam}' not found on endpoint` });
+  }
+  const { enabled, probability, params } = req.body || {};
+  if (enabled !== void 0) {
+    rule.enabled = Boolean(enabled);
+  }
+  if (probability !== void 0) {
+    rule.probability = Math.min(1, Math.max(0, Number(probability)));
+  }
+  if (params && typeof params === "object") {
+    rule.params = {
+      ...rule.params,
+      ...params
+    };
+  }
+  endpointsMap.set(endpoint.id, endpoint);
+  persistState();
+  res.json({ success: true, endpoint, rule });
+});
 app.delete("/api/v1/endpoints/:id", (req, res) => {
   let endpoint = endpointsMap.get(req.params.id);
   if (!endpoint) {
@@ -1039,6 +1179,8 @@ app.delete("/api/v1/endpoints/:id", (req, res) => {
   if (!auth.authorized) {
     return res.status(403).json({ success: false, error: auth.reason });
   }
+  deletedEndpointIds.add(endpoint.id);
+  slugToIdMap.delete(endpoint.slug.toLowerCase().trim());
   slugToIdMap.delete(endpoint.slug);
   endpointsMap.delete(endpoint.id);
   logsMap.delete(endpoint.id);

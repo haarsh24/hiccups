@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Zap, Copy, Check, ChevronDown, ChevronUp, Clock, Code2, History, RotateCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ChaosEndpoint, TestExecutionResult } from '../types';
-import { getEndpointOrigin } from '../lib/config';
+import { getEndpointOrigin, getApiUrl, getDefaultApiHeaders } from '../lib/config';
 
 interface PlaygroundProps {
   endpoints: ChaosEndpoint[];
@@ -47,6 +47,12 @@ export const Playground: React.FC<PlaygroundProps> = ({
   const [burstResults, setBurstResults] = useState<TestExecutionResult[]>([]);
   const [history, setHistory] = useState<RequestHistoryItem[]>([]);
 
+  // Clear previous execution results whenever selected endpoint changes to prevent stale responses (Fixes Defect #3)
+  useEffect(() => {
+    setLatestResponse(null);
+    setBurstResults([]);
+  }, [activeEndpointId]);
+
   const origin = getEndpointOrigin();
   const cleanSubpath = subpath ? (subpath.startsWith('/') ? subpath : `/${subpath}`) : '';
   const fullTargetUrl = activeEndpoint?.slug ? `${origin}/e/${activeEndpoint.slug}${cleanSubpath}` : '';
@@ -85,16 +91,42 @@ export const Playground: React.FC<PlaygroundProps> = ({
         }
       }
 
+      // Attach default session headers if not overridden
+      const baseApiHeaders = getDefaultApiHeaders();
+      const combinedHeaders: Record<string, string> = {
+        ...baseApiHeaders,
+        ...customHeaders
+      };
+
       const options: RequestInit = {
         method,
-        headers: customHeaders
+        headers: combinedHeaders
       };
 
       if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && requestBodyText.trim()) {
         options.body = requestBodyText;
       }
 
-      const res = await fetch(fullTargetUrl, options);
+      let res = await fetch(fullTargetUrl, options);
+      let behavior = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || (res.ok ? 'clean_200' : 'error_response');
+
+      // If backend instance cold-started without this endpoint, auto-sync and retry probe seamlessly
+      if (res.status === 404 && behavior === 'not_found' && activeEndpoint && !activeEndpoint.isDemo) {
+        try {
+          const syncRes = await fetch(getApiUrl('/api/v1/endpoints/sync'), {
+            method: 'POST',
+            headers: getDefaultApiHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ endpoints: [activeEndpoint] })
+          });
+          if (syncRes.ok) {
+            res = await fetch(fullTargetUrl, options);
+            behavior = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || (res.ok ? 'clean_200' : 'error_response');
+          }
+        } catch {
+          // ignore resync error and show initial response
+        }
+      }
+
       const endTime = performance.now();
       const durationMs = Math.round(endTime - startTime);
 
@@ -103,7 +135,6 @@ export const Playground: React.FC<PlaygroundProps> = ({
         headerMap[key] = val;
       });
 
-      const behavior = res.headers.get('x-hiccup-behavior') || res.headers.get('x-faultline-behavior') || (res.ok ? 'clean_200' : 'error_response');
       const responseText = await res.text();
 
       const result: TestExecutionResult = {

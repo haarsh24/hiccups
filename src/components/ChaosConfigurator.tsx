@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   AlertTriangle,
@@ -11,6 +11,68 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { ChaosEndpoint, ChaosRule, BehaviorType } from '../types';
+
+interface NumericInputProps {
+  value: number | undefined;
+  defaultValue?: number;
+  min?: number;
+  max?: number;
+  onChange: (val: number) => void;
+  className?: string;
+  placeholder?: string;
+}
+
+const NumericInput: React.FC<NumericInputProps> = ({
+  value,
+  defaultValue = 0,
+  min = 0,
+  max = 60000,
+  onChange,
+  className = '',
+  placeholder
+}) => {
+  const currentVal = value ?? defaultValue;
+  const [localVal, setLocalVal] = useState<string>(String(currentVal));
+
+  useEffect(() => {
+    setLocalVal(String(value ?? defaultValue));
+  }, [value, defaultValue]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLocalVal(raw);
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed)) {
+      const clamped = Math.max(min, Math.min(max, parsed));
+      onChange(clamped);
+    }
+  };
+
+  const handleBlur = () => {
+    const parsed = parseInt(localVal, 10);
+    if (isNaN(parsed) || localVal.trim() === '') {
+      setLocalVal(String(defaultValue));
+      onChange(defaultValue);
+    } else {
+      const clamped = Math.max(min, Math.min(max, parsed));
+      setLocalVal(String(clamped));
+      onChange(clamped);
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={localVal}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+};
 
 interface ChaosConfiguratorProps {
   endpoint: ChaosEndpoint;
@@ -160,19 +222,23 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-zinc-500 text-[10px] uppercase mb-1">Min (ms)</label>
-                      <input
-                        type="number"
-                        value={latencyRule.params.latency?.minMs || 500}
-                        onChange={(e) => updateRuleParams(latencyRule, 'latency', { minMs: parseInt(e.target.value) || 0 })}
+                      <NumericInput
+                        value={latencyRule.params.latency?.minMs}
+                        defaultValue={500}
+                        min={0}
+                        max={60000}
+                        onChange={(val) => updateRuleParams(latencyRule, 'latency', { minMs: val })}
                         className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                       />
                     </div>
                     <div>
                       <label className="block text-zinc-500 text-[10px] uppercase mb-1">Max (ms)</label>
-                      <input
-                        type="number"
-                        value={latencyRule.params.latency?.maxMs || 2500}
-                        onChange={(e) => updateRuleParams(latencyRule, 'latency', { maxMs: parseInt(e.target.value) || 0 })}
+                      <NumericInput
+                        value={latencyRule.params.latency?.maxMs}
+                        defaultValue={2500}
+                        min={0}
+                        max={60000}
+                        onChange={(val) => updateRuleParams(latencyRule, 'latency', { maxMs: val })}
                         className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                       />
                     </div>
@@ -400,19 +466,23 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
               <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3.5 grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-500 text-[10px] uppercase mb-1">Max Req/Min</label>
-                  <input
-                    type="number"
-                    value={rateLimitRule.params.rateLimit?.maxRequestsPerMin || 10}
-                    onChange={(e) => updateRuleParams(rateLimitRule, 'rateLimit', { maxRequestsPerMin: parseInt(e.target.value) || 1 })}
+                  <NumericInput
+                    value={rateLimitRule.params.rateLimit?.maxRequestsPerMin}
+                    defaultValue={10}
+                    min={1}
+                    max={1000}
+                    onChange={(val) => updateRuleParams(rateLimitRule, 'rateLimit', { maxRequestsPerMin: val })}
                     className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
                 <div>
                   <label className="block text-zinc-500 text-[10px] uppercase mb-1">Retry-After (sec)</label>
-                  <input
-                    type="number"
-                    value={rateLimitRule.params.rateLimit?.retryAfterSeconds || 15}
-                    onChange={(e) => updateRuleParams(rateLimitRule, 'rateLimit', { retryAfterSeconds: parseInt(e.target.value) || 1 })}
+                  <NumericInput
+                    value={rateLimitRule.params.rateLimit?.retryAfterSeconds}
+                    defaultValue={15}
+                    min={1}
+                    max={3600}
+                    onChange={(val) => updateRuleParams(rateLimitRule, 'rateLimit', { retryAfterSeconds: val })}
                     className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
@@ -450,19 +520,23 @@ export const ChaosConfigurator: React.FC<ChaosConfiguratorProps> = ({
               <div className="bg-zinc-50 border border-zinc-200/80 rounded-xl p-3.5 grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-500 text-[10px] uppercase mb-1">Bytes / Chunk</label>
-                  <input
-                    type="number"
-                    value={dripRule.params.drip?.chunkSizeBytes || 16}
-                    onChange={(e) => updateRuleParams(dripRule, 'drip', { chunkSizeBytes: parseInt(e.target.value) || 1 })}
+                  <NumericInput
+                    value={dripRule.params.drip?.chunkSizeBytes}
+                    defaultValue={16}
+                    min={1}
+                    max={8192}
+                    onChange={(val) => updateRuleParams(dripRule, 'drip', { chunkSizeBytes: val })}
                     className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
                 <div>
                   <label className="block text-zinc-500 text-[10px] uppercase mb-1">Delay (ms)</label>
-                  <input
-                    type="number"
-                    value={dripRule.params.drip?.delayMsPerChunk || 200}
-                    onChange={(e) => updateRuleParams(dripRule, 'drip', { delayMsPerChunk: parseInt(e.target.value) || 10 })}
+                  <NumericInput
+                    value={dripRule.params.drip?.delayMsPerChunk}
+                    defaultValue={200}
+                    min={10}
+                    max={10000}
+                    onChange={(val) => updateRuleParams(dripRule, 'drip', { delayMsPerChunk: val })}
                     className="w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                   />
                 </div>
