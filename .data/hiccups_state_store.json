@@ -6,14 +6,14 @@
       "name": "Demo Chaos Endpoint",
       "isAnonymous": false,
       "isDemo": true,
-      "createdAt": "2026-10-11T18:18:22.563Z",
+      "createdAt": "2026-10-12T07:12:15.711Z",
       "expiresAt": null,
       "flakyPercentage": 50,
       "defaultResponseStatus": 200,
       "defaultResponseBody": "{\n  \"status\": \"ok\",\n  \"message\": \"Hello from Hiccups! This endpoint was reached successfully without chaos.\"\n}",
       "rules": [
         {
-          "id": "r-lat-1791742702564",
+          "id": "r-lat-1791789135712",
           "type": "latency",
           "enabled": true,
           "probability": 0.7,
@@ -26,7 +26,7 @@
           }
         },
         {
-          "id": "r-err-1791742702564",
+          "id": "r-err-1791789135712",
           "type": "error",
           "enabled": true,
           "probability": 0.4,
@@ -38,7 +38,7 @@
           }
         },
         {
-          "id": "r-drop-1791742702564",
+          "id": "r-drop-1791789135712",
           "type": "drop",
           "enabled": false,
           "probability": 0.2,
@@ -50,7 +50,7 @@
           }
         },
         {
-          "id": "r-hang-1791742702564",
+          "id": "r-hang-1791789135712",
           "type": "hang",
           "enabled": false,
           "probability": 0.1,
@@ -61,7 +61,7 @@
           }
         },
         {
-          "id": "r-rl-1791742702564",
+          "id": "r-rl-1791789135712",
           "type": "rate_limit",
           "enabled": false,
           "probability": 1,
@@ -74,7 +74,7 @@
           }
         },
         {
-          "id": "r-drip-1791742702564",
+          "id": "r-drip-1791789135712",
           "type": "drip",
           "enabled": false,
           "probability": 0.5,
@@ -1008,6 +1008,95 @@
           }
         }
       ]
+    },
+    {
+      "id": "ep-1791789208953-ihyl",
+      "slug": "rocky-bridge-75",
+      "name": "24h Quick Sandbox",
+      "isAnonymous": true,
+      "ownerSessionId": "test_session_1791789207853",
+      "managementToken": "mgm_1791789208953_276xno1k",
+      "createdAt": "2026-10-12T07:13:28.953Z",
+      "expiresAt": "2026-10-13T07:13:28.953Z",
+      "flakyPercentage": 60,
+      "defaultResponseStatus": 200,
+      "defaultResponseBody": "{\n  \"status\": \"success\",\n  \"data\": \"Clean response from your Hiccups sandbox endpoint.\"\n}",
+      "rules": [
+        {
+          "id": "r-lat-1791789208953",
+          "type": "latency",
+          "enabled": true,
+          "probability": 0.7,
+          "params": {
+            "latency": {
+              "minMs": 500,
+              "maxMs": 2000,
+              "jitter": true
+            }
+          }
+        },
+        {
+          "id": "r-err-1791789208953",
+          "type": "error",
+          "enabled": true,
+          "probability": 0.4,
+          "params": {
+            "error": {
+              "statusCode": 503,
+              "customBody": "{\n  \"error\": \"Service Unavailable\",\n  \"code\": \"HICCUP_INJECTED_503\",\n  \"message\": \"Chaos rule triggered\"\n}"
+            }
+          }
+        },
+        {
+          "id": "r-drop-1791789208953",
+          "type": "drop",
+          "enabled": false,
+          "probability": 0.2,
+          "params": {
+            "drop": {
+              "mode": "partial",
+              "bytesBeforeDrop": 64
+            }
+          }
+        },
+        {
+          "id": "r-hang-1791789208953",
+          "type": "hang",
+          "enabled": false,
+          "probability": 0.1,
+          "params": {
+            "hang": {
+              "durationSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-rl-1791789208953",
+          "type": "rate_limit",
+          "enabled": false,
+          "probability": 1,
+          "params": {
+            "rateLimit": {
+              "maxRequestsPerMin": 10,
+              "burstAllowance": 2,
+              "retryAfterSeconds": 15
+            }
+          }
+        },
+        {
+          "id": "r-drip-1791789208953",
+          "type": "drip",
+          "enabled": false,
+          "probability": 0.5,
+          "params": {
+            "drip": {
+              "chunkSizeBytes": 16,
+              "delayMsPerChunk": 150,
+              "totalBytes": 256
+            }
+          }
+        }
+      ]
     }
   ],
   "slugs": [
@@ -1070,6 +1159,10 @@
     [
       "unstable-wave-46",
       "ep-1791746409366-uefg"
+    ],
+    [
+      "rocky-bridge-75",
+      "ep-1791789208953-ihyl"
     ]
   ]
 }
